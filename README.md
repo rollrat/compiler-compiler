@@ -89,3 +89,103 @@ I9 => SHIFT{(multiple,I7)}
 I10 => REDUCE{(multiple,term,0),(plus,term,0),(op_close,term,0),($,term,0)}
 I11 => REDUCE{(multiple,factor,1),(plus,factor,1),(op_close,factor,1),($,factor,1)}
 ```
+
+## Shift Reduce Parser
+
+``` cs
+var gen = new ParserGenerator();
+
+// Non-Terminals
+var exp = gen.CreateNewProduction("exp", false);
+var term = gen.CreateNewProduction("term", false);
+var factor = gen.CreateNewProduction("factor", false);
+
+// Terminals
+var plus = gen.CreateNewProduction("plus");
+var minus = gen.CreateNewProduction("minus");
+var multiple = gen.CreateNewProduction("multiple");
+var divide = gen.CreateNewProduction("divide");
+var id = gen.CreateNewProduction("id");
+var op_open = gen.CreateNewProduction("op_open");
+var op_close = gen.CreateNewProduction("op_close");
+
+exp |= exp + plus + term;
+//exp |= exp + minus + term;
+exp |= term;
+term |= term + multiple + factor;
+//term |= term + divide + factor;
+term |= factor;
+factor |= op_open + exp + op_close;
+factor |= id;
+
+gen.PushStarts(exp);
+gen.Generate();
+var slr = gen.CreateShiftReduceParserInstance();
+
+// 2*4+5$
+
+Action<string, string> insert = (string x, string y) =>
+{
+    slr.Insert(x, y);
+    while (slr.Reduce())
+    {
+        var l = slr.LastestReduce();
+        Console.Instance.Write(l[0].Item1.PadLeft(8) + " => ");
+        l.RemoveAt(0);
+        Console.Instance.WriteLine(string.Join(" ", l.Select(z => z.Item1)));
+        l = slr.LastestReduce();
+        Console.Instance.Write(l[0].Item1.PadLeft(8) + " => ");
+        l.RemoveAt(0);
+        Console.Instance.WriteLine(string.Join(" ", l.Select(z => z.Item2)));
+        slr.Insert(x, y);
+    }
+};
+
+insert("id",       "2");
+insert("plus",     "+");
+insert("id",       "4");
+insert("multiple", "*");
+insert("op_open",  "(");
+insert("id",       "6");
+insert("plus",     "+");
+insert("id",       "4");
+insert("multiple", "*");
+insert("id",       "7");
+insert("op_close", ")");
+insert("$",        "$");
+```
+
+```
+  factor => id
+  factor => 2
+    term => factor
+    term => 2
+     exp => term
+     exp => 2
+  factor => id
+  factor => 4
+    term => factor
+    term => 4
+  factor => id
+  factor => 6
+    term => factor
+    term => 6
+     exp => term
+     exp => 6
+  factor => id
+  factor => 4
+    term => factor
+    term => 4
+  factor => id
+  factor => 7
+    term => term multiple factor
+    term => 4 * 7
+     exp => exp plus term
+     exp => 6 + 4*7
+  factor => op_open exp op_close
+  factor => ( 6+4*7 )
+    term => term multiple factor
+    term => 4 * (6+4*7)
+     exp => exp plus term
+     exp => 2 + 4*(6+4*7)
+```
