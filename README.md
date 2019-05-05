@@ -18,7 +18,6 @@ sg.PushRule("id", "(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)(a|b|c|d
 sg.PushRule("num", "(0|1|2|3|4|5|6|7|8|9)+");
 sg.Generate();
 sg.PrintDiagram();
-sg.CreateScannerInstance();
  
 var scanner = sg.CreateScannerInstance();
 scanner.AllocateTarget("asdf a1321 if else 0415 0456a 9999");
