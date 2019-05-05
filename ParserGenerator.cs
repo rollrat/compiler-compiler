@@ -290,6 +290,8 @@ namespace ParserGenerator
             // (production_rule_index, (sub_productions_pos))
             var first_visit = new Dictionary<int, HashSet<int>>();
             first_q.Enqueue(new Tuple<int, int>(production_rule_index, 0));
+            for (int j = 0; j < production_rules[production_rule_index].sub_productions.Count; j++)
+                first_q.Enqueue(new Tuple<int, int>(production_rule_index, j));
             // Get all of starts node FIRST non-terminals
             while (first_q.Count != 0)
             {
