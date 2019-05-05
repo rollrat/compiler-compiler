@@ -310,6 +310,65 @@ namespace ParserGenerator
             }
             return first_l;
         }
+       
+        public ShiftReduceParser CreateShiftReduceParserInstance()
+        {
+            var symbol_table = new Dictionary<string, int>();
+            var jump_table = new int[number_of_states][];
+            var goto_table = new int[number_of_states][];
+            var grammar = new List<List<int>>();
+            var grammar_group = new List<int>();
+            var production_mapping = new List<List<int>>();
+            var pm_count = 0;
+            
+            foreach (var pr in production_rules)
+            {
+                var ll = new List<List<int>>();
+                var pm = new List<int>();
+                foreach (var sub_pr in pr.sub_productions)
+                {
+                    ll.Add(sub_pr.Select(x => x.index).ToList());
+                    pm.Add(pm_count++);
+                    grammar_group.Add(production_mapping.Count);
+                }
+                grammar.AddRange(ll);
+                production_mapping.Add(pm);
+            }
+
+            for (int i = 0; i < number_of_states; i++)
+            {
+                // Last elements is sentinel
+                jump_table[i] = new int[production_rules.Count + 1];
+                goto_table[i] = new int[production_rules.Count + 1];
+            }
+
+            foreach (var pr in production_rules)
+                symbol_table.Add(pr.production_name ?? "^", pr.index);
+            symbol_table.Add("$", production_rules.Count);
+
+            foreach (var shift in shift_info)
+                foreach (var elem in shift.Value)
+                {
+                    jump_table[shift.Key][elem.Item1] = 1;
+                    goto_table[shift.Key][elem.Item1] = elem.Item2;
+                }
+
+            foreach (var reduce in reduce_info)
+                foreach (var elem in reduce.Value)
+                {
+                    var index = elem.Item1;
+                    if (index == -1) index = production_rules.Count;
+                    if (elem.Item2 == 0)
+                        jump_table[reduce.Key][index] = 3;
+                    else
+                    {
+                        jump_table[reduce.Key][index] = 2;
+                        goto_table[reduce.Key][index] = production_mapping[elem.Item2][elem.Item3];
+                    }
+                }
+
+            return new ShiftReduceParser(symbol_table, jump_table, goto_table, grammar_group.ToArray(), grammar.Select(x => x.ToArray()).ToArray());
+        }
     }
 
     /// <summary>
@@ -317,35 +376,94 @@ namespace ParserGenerator
     /// </summary>
     public class ShiftReduceParser
     {
-        public void Test()
+        Dictionary<string, int> symbol_name_index = new Dictionary<string, int>();
+        List<string> symbol_index_name = new List<string>();
+        Stack<int> state_stack = new Stack<int>();
+        Stack<int> production_stack = new Stack<int>();
+        Stack<string> contents_stack = new Stack<string>();
+
+        // 3       1      2       0
+        // Accept? Shift? Reduce? Error?
+        int[][] jump_table;
+        int[][] goto_table;
+        int[][] production;
+        int[] group_table;
+
+        public ShiftReduceParser(Dictionary<string, int> symbol_table, int[][] jump_table, int[][] goto_table, int[] group_table, int[][] production)
         {
-            var gen = new ParserGenerator();
+            symbol_name_index = symbol_table;
+            this.jump_table = jump_table;
+            this.goto_table = goto_table;
+            this.production = production;
+            this.group_table = group_table;
+            var l = symbol_table.ToList().Select(x => new Tuple<int, string>(x.Value, x.Key)).ToList();
+            l.Sort();
+            l.ForEach(x => symbol_index_name.Add(x.Item2));
+        }
+        
+        bool latest_error;
+        bool latest_reduce;
+        public bool Accept() => state_stack.Count == 0;
+        public bool Error() => latest_error;
+        public bool Reduce() => latest_reduce;
+        
+        public void Insert(string token_name, string contents) => Insert(symbol_name_index[token_name], contents);
+        public void Insert(int index, string contents)
+        {
+            if (state_stack.Count == 0)
+            {
+                state_stack.Push(0);
+                latest_error = false;
+            }
+            latest_reduce = false;
 
-            // Non-Terminals
-            var exp = gen.CreateNewProduction("exp", false);
-            var term = gen.CreateNewProduction("term", false);
-            var factor = gen.CreateNewProduction("factor", false);
+            switch (jump_table[state_stack.Peek()][index])
+            {
+                case 0:
+                    // Panic mode
+                    state_stack.Clear();
+                    production_stack.Clear();
+                    contents_stack.Clear();
+                    latest_error = true;
+                    break;
 
-            // Terminals
-            var plus = gen.CreateNewProduction("plus");
-            var minus = gen.CreateNewProduction("minus");
-            var multiple = gen.CreateNewProduction("multiple");
-            var divide = gen.CreateNewProduction("divide");
-            var id = gen.CreateNewProduction("id");
-            var op_open = gen.CreateNewProduction("op_open");
-            var op_close = gen.CreateNewProduction("op_close");
+                case 1:
+                    // Shift
+                    state_stack.Push(goto_table[state_stack.Peek()][index]);
+                    production_stack.Push(index);
+                    contents_stack.Push(contents);
+                    break;
 
-            exp |= exp + plus + term;
-            //exp |= exp + minus + term;
-            exp |= term;
-            term |= term + multiple + factor;
-            //term |= term + divide + factor;
-            term |= factor;
-            factor |= id;
-            factor |= op_open + exp + op_close;
+                case 2:
+                    // Reduce
+                    reduce(index);
+                    latest_reduce = true;
+                    break;
 
-            gen.PushStarts(exp);
-            gen.Generate();
+                case 3:
+                    // Nothing
+                    break;
+            }
+        }
+
+        List<Tuple<int,string>> reduce_nodes = new List<Tuple<int, string>>();
+        public List<Tuple<string,string>> LastestReduce() => reduce_nodes.Select(x => new Tuple<string,string>( symbol_index_name[x.Item1], x.Item2)).ToList();
+        private void reduce(int index)
+        {
+            var reduce_production = goto_table[state_stack.Peek()][index];
+
+            // Reduce Stack
+            reduce_nodes.Clear();
+            for (int i = 0; i < production[reduce_production].Length; i++)
+            {
+                state_stack.Pop();
+                reduce_nodes.Insert(0, new Tuple<int, string> (production_stack.Pop(), contents_stack.Pop()));
+            }
+            reduce_nodes.Insert(0, new Tuple<int, string>(group_table[reduce_production], ""));
+
+            state_stack.Push(goto_table[state_stack.Peek()][group_table[reduce_production]]);
+            production_stack.Push(group_table[reduce_production]);
+            contents_stack.Push(string.Join("", reduce_nodes.Select(x => x.Item2)));
         }
     }
 
