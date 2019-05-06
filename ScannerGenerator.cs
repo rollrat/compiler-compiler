@@ -194,8 +194,36 @@ namespace ParserGenerator
                         cur.transition.Add(new Tuple<char, transition_node>(e_closure, second_valid_stack.Peek()));
                         break;
                         
-                    //case '[':
-                    //case ']':
+                    case '[':
+                        var ch_list = new List<char>();
+                        i++;
+                        for (; i < pattern.Length && pattern[i] != ']'; i++)
+                        {
+                            if (pattern[i] == '\\' && i + 1 < pattern.Length)
+                                ch_list.Add(pattern[++i]);
+                            else if (i + 2 < pattern.Length && pattern[i + 1] == '-')
+                            { 
+                                for (int j = pattern[i]; j <= pattern[i + 2]; j++)
+                                    ch_list.Add((char)j);
+                                i += 2;
+                            }
+                            else
+                                ch_list.Add(pattern[i]);
+                        }
+                        var ends_point2 = new transition_node { index = index_count++, transition = new List<Tuple<char, transition_node>>() };
+                        foreach (var ch2 in ch_list)
+                        {
+                            cur.transition.Add(new Tuple<char, transition_node>(ch2, ends_point2));
+                        }
+                        cur = ends_point2;
+                        nodes.Add(cur);
+                        if (first_valid_stack.Count != 0)
+                        {
+                            second_valid_stack.Push(first_valid_stack.Peek());
+                        }
+                        first_valid_stack.Push(cur);
+                        break;
+                        
                     case '\\':
                     default:
                         char ch = pattern[i];
