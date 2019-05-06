@@ -3,7 +3,7 @@ Compiler Compiler based on CSharp
 
 ## Scanner Generator / Lexical Analyzer Generator
 
-A tool for analyzing regular expressions using `(`,`)`,`+`,`*`,`?`,`|` as tokens and generating Scanner tables.
+A tool for analyzing regular expressions using `(`,`)`,`+`,`*`,`?`,`|`,`[`,`]` as tokens and generating Scanner tables.
 
 There is a Delimiter problem, and it is currently being resolved.
 
@@ -14,8 +14,8 @@ var sg = new ScannerGenerator();
 sg.PushRule("if", "if");
 sg.PushRule("for", "for");
 sg.PushRule("else", "else");
-sg.PushRule("id", "(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z|0|1|2|3|4|5|6|7|8|9)*");
-sg.PushRule("num", "(0|1|2|3|4|5|6|7|8|9)+");
+sg.PushRule("id", "[a-z][a-z0-9]*");
+sg.PushRule("num", "[0-9]+");
 sg.Generate();
 sg.PrintDiagram();
  
