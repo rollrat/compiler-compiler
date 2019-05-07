@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace arserGenerator
+namespace ParserGenerator
 {
     public class ParserProduction
     {
@@ -476,5 +476,4 @@ namespace arserGenerator
             contents_stack.Push(string.Join("", reduce_nodes.Select(x => x.Item2)));
         }
     }
-
 }
