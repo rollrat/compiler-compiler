@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace ParserGenerator
+namespace arserGenerator
 {
     public class ParserProduction
     {
@@ -74,7 +74,7 @@ namespace ParserGenerator
 
         public void PushStarts(ParserProduction pp)
         {
-            // Augement stats node
+            // Augment stats node
             production_rules[0].sub_productions.Add(new List<ParserProduction> { pp });
         }
 
@@ -97,6 +97,10 @@ namespace ParserGenerator
                     Console.WriteLine(
                         $"{prefix}({production_rules[i].production_name})={{{string.Join(",", lhs[i].ToList().Select(x => x == -1 ? "$" : production_rules[x].production_name))}}}");
         }
+
+        int number_of_states = -1;
+        Dictionary<int, List<Tuple<int, int>>> shift_info;
+        Dictionary<int, List<Tuple<int, int, int>>> reduce_info;
 
         /// <summary>
         /// Generate SimpleLR Table
@@ -137,9 +141,11 @@ namespace ParserGenerator
                         if (rule.Last().isterminal == false)
                             foreach (var r in FOLLOW[i])
                                 FOLLOW[rule.Last().index].Add(r);
-            
+
+#if false
             print_hs(FIRST, "FIRST");
             print_hs(FOLLOW, "FOLLOW");
+#endif
             // --------------------------------------------------------
 
             // (state_index, (production_rule_index, sub_productions_pos, dot_position)
@@ -147,9 +153,9 @@ namespace ParserGenerator
             // (state_specify, state_index)
             var state_index = new Dictionary<string, int>();
             // (state_index, (reduce_what, state_index))
-            var shift_info = new Dictionary<int, List<Tuple<int, int>>>();
+            shift_info = new Dictionary<int, List<Tuple<int, int>>>();
             // (state_index, (shift_what, production_rule_index, sub_productions_pos))
-            var reduce_info = new Dictionary<int, List<Tuple<int, int, int>>>();
+            reduce_info = new Dictionary<int, List<Tuple<int, int, int>>>();
             var index_count = 0;
 
             // -------------------- Put first eater -------------------
@@ -230,6 +236,7 @@ namespace ParserGenerator
                     }
             }
 
+#if false
             // Print result
             for (int i = 0; i < index_count; i++)
             {
@@ -246,6 +253,9 @@ namespace ParserGenerator
                     builder.Append("REDUCE{" + string.Join(",", reduce_info[i].Select(y => $"({(y.Item1 == -1 ? "$" : production_rules[y.Item1].production_name)},{(y.Item2 == 0 ? "accept" : production_rules[y.Item2].production_name)},{y.Item3})")) + "}");
                 Console.WriteLine(builder.ToString());
             }
+#endif
+
+            number_of_states = states.Count;
         }
 
         /// <summary>
@@ -310,7 +320,7 @@ namespace ParserGenerator
             }
             return first_l;
         }
-       
+
         public ShiftReduceParser CreateShiftReduceParserInstance()
         {
             var symbol_table = new Dictionary<string, int>();
