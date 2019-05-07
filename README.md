@@ -141,18 +141,28 @@ Action<string, string> insert = (string x, string y) =>
     }
 };
 
-insert("id",       "2");
-insert("plus",     "+");
-insert("id",       "4");
-insert("multiple", "*");
-insert("op_open",  "(");
-insert("id",       "6");
-insert("plus",     "+");
-insert("id",       "4");
-insert("multiple", "*");
-insert("id",       "7");
-insert("op_close", ")");
-insert("$",        "$");
+var sg2 = new ScannerGenerator();
+sg2.PushRule("", "[\\r\\n ]");
+sg2.PushRule("plus", "\\+");
+sg2.PushRule("minus", "-");
+sg2.PushRule("multiple", "\\*");
+sg2.PushRule("divide", "\\/");
+sg2.PushRule("op_open", "\\(");
+sg2.PushRule("op_close", "\\)");
+sg2.PushRule("id", "[a-z][a-z0-9]*");
+sg2.PushRule("num", "[0-9]+");
+sg2.Generate();
+sg2.PrintDiagram();
+sg2.CreateScannerInstance();
+
+var scanner2 = sg2.CreateScannerInstance();
+scanner2.AllocateTarget("2+6*(6+4*7)");
+
+while (scanner2.Valid())
+{
+    var ss = scanner2.Next();
+    insert(ss.Item1,ss.Item2);
+}
 ```
 
 ```
