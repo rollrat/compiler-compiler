@@ -193,16 +193,38 @@ namespace ParserGenerator
                         second_valid_stack.Peek().transition.Add(new Tuple<char, transition_node>(e_closure, cur));
                         cur.transition.Add(new Tuple<char, transition_node>(e_closure, second_valid_stack.Peek()));
                         break;
-                        
+
                     case '[':
                         var ch_list = new List<char>();
                         i++;
                         for (; i < pattern.Length && pattern[i] != ']'; i++)
                         {
                             if (pattern[i] == '\\' && i + 1 < pattern.Length)
-                                ch_list.Add(pattern[++i]);
+                            {
+                                if (@"+-?*|()[].=<>/".Contains(pattern[i]))
+                                    ch_list.Add(pattern[++i]);
+                                else
+                                {
+                                    switch (pattern[++i])
+                                    {
+                                        case 'n':
+                                            ch_list.Add('\n');
+                                            break;
+                                        case 't':
+                                            ch_list.Add('\t');
+                                            break;
+                                        case 'r':
+                                            ch_list.Add('\t');
+                                            break;
+
+                                        default:
+                                            build_errors.Add($"{pattern[i]} escape character not found!");
+                                            break;
+                                    }
+                                }
+                            }
                             else if (i + 2 < pattern.Length && pattern[i + 1] == '-')
-                            { 
+                            {
                                 for (int j = pattern[i]; j <= pattern[i + 2]; j++)
                                     ch_list.Add((char)j);
                                 i += 2;
@@ -223,7 +245,7 @@ namespace ParserGenerator
                         }
                         first_valid_stack.Push(cur);
                         break;
-                        
+
                     case '\\':
                     default:
                         char ch = pattern[i];
@@ -593,11 +615,24 @@ namespace ParserGenerator
 
             color.AddRange(Enumerable.Repeat(0, dia.count_of_vertex));
 
+#if true   // For distingushiable states
+            var color_set = new Dictionary<string, int>();
+#endif
+
             foreach (var node in dia.nodes)
                 if (node.is_acceptable)
                 {
                     color[node.index] = color_count;
                     check[node.index] = true;
+
+#if true   // For distingushiable states
+                    if (node.accept_token_names != null)
+                    {
+                        if (!color_set.ContainsKey(node.accept_token_names[0]))
+                            color_set.Add(node.accept_token_names[0], color_count++);
+                        color[node.index] = color_set[node.accept_token_names[0]];
+                    }
+#endif
                 }
 
             color_count++;
@@ -817,7 +852,7 @@ namespace ParserGenerator
             return result;
         }
         
-        public Scanner CreateScannerInstance()
+        public Scanner CreateScannerInstance(string delimiter = "\n\r ")
         {
             if (!freeze) throw new Exception("Retry after generate!");
             
@@ -829,7 +864,7 @@ namespace ParserGenerator
                 for (int j = 0; j < 255; j++)
                     table[i][j] = -1;
             }
-
+            
             // Fill transitions
             for (int i = 0; i < diagram.nodes.Count; i++)
                 foreach (var transition in diagram.nodes[i].transition)
@@ -843,7 +878,7 @@ namespace ParserGenerator
             return new Scanner(table, accept_table);
         }
     }
-   
+
     /// <summary>
     /// Simple Scanner
     /// </summary>
