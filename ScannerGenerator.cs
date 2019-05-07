@@ -817,7 +817,7 @@ namespace ParserGenerator
             return result;
         }
         
-        public Scanner CreateScannerInstance(string delimiter = "\n\r ")
+        public Scanner CreateScannerInstance()
         {
             if (!freeze) throw new Exception("Retry after generate!");
             
@@ -829,11 +829,6 @@ namespace ParserGenerator
                 for (int j = 0; j < 255; j++)
                     table[i][j] = -1;
             }
-
-            // Fill delimeters
-            foreach (var ch in delimiter)
-                for (int i = 0; i < table.Length; i++)
-                    table[i][0] = table[i][ch] = int.MaxValue;
 
             // Fill transitions
             for (int i = 0; i < diagram.nodes.Count; i++)
@@ -848,7 +843,7 @@ namespace ParserGenerator
             return new Scanner(table, accept_table);
         }
     }
-
+   
     /// <summary>
     /// Simple Scanner
     /// </summary>
@@ -858,6 +853,9 @@ namespace ParserGenerator
         string[] accept_table;
         string target;
         int pos = 0;
+        bool err = false;
+        int latest_pos;
+        List<int> err_pos;
 
         public Scanner(int[][] transition_table, string[] accept_table)
         {
@@ -869,6 +867,8 @@ namespace ParserGenerator
         {
             target = literal;
             pos = 0;
+            err_pos = new List<int>();
+            err = false;
         }
 
         public bool Valid()
@@ -876,11 +876,18 @@ namespace ParserGenerator
             return pos < target.Length;
         }
 
-        public Tuple<string,string> Next()
+        public bool Error()
+        {
+            return err;
+        }
+
+        public int Position { get { return latest_pos; } }
+
+        public Tuple<string, string> Next()
         {
             var builder = new StringBuilder();
             var node_pos = 0;
-            var lexing_error = false;
+            latest_pos = pos;
 
             for (; pos < target.Length; pos++)
             {
@@ -889,26 +896,35 @@ namespace ParserGenerator
                 switch (next_transition)
                 {
                     case -1:
-                        lexing_error = true;
-                        next_transition = node_pos;
-                        break;
-
-                    case int.MaxValue:
-                        pos++;
-                        if (lexing_error)
-                            return new Tuple<string, string>(null, builder.ToString());
+                        // No-name
+                        if (accept_table[node_pos] == "")
+                        {
+                            // Drop string and initialization
+                            builder.Clear();
+                            latest_pos = pos;
+                            pos--;
+                            node_pos = 0;
+                            continue;
+                        }
+                        if (accept_table[node_pos] == null)
+                        {
+                            err = true;
+                            err_pos.Add(pos);
+                            continue;
+                        }
                         return new Tuple<string, string>(accept_table[node_pos], builder.ToString());
+
+                    default:
+                        builder.Append(target[pos]);
+                        break;
                 }
 
-                builder.Append(target[pos]);
                 node_pos = next_transition;
             }
 
-            if (lexing_error)
-                return new Tuple<string, string>(null, builder.ToString());
             return new Tuple<string, string>(accept_table[node_pos], builder.ToString());
         }
-
+        
         public Tuple<string, string> Lookahead()
         {
             var npos = pos;
