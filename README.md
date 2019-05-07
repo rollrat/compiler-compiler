@@ -5,12 +5,11 @@ Compiler Compiler based on CSharp
 
 A tool for analyzing regular expressions using `(`,`)`,`+`,`*`,`?`,`|`,`[`,`]` as tokens and generating Scanner tables.
 
-There is a Delimiter problem, and it is currently being resolved.
-
 ### Example
 
 ``` cs
 var sg = new ScannerGenerator();
+sg.PushRule("", "[\\r\\n ]");
 sg.PushRule("if", "if");
 sg.PushRule("for", "for");
 sg.PushRule("else", "else");
@@ -20,7 +19,7 @@ sg.Generate();
 sg.PrintDiagram();
  
 var scanner = sg.CreateScannerInstance();
-scanner.AllocateTarget("asdf a1321 if else 0415 0456a 9999");
+scanner.AllocateTarget("+/a1321    if else 0415abse+9999");
 while (scanner.Valid())
 {
     var ss = scanner.Next();
@@ -29,13 +28,14 @@ while (scanner.Valid())
 ```
 
 ```
-id, asdf
 plus, +
-id, a1321
+id, a1321 // Ignore '/'
 if, if
 else, else
 num, 0415
-, abse+9999  // Scan error from delimiter problem
+id, abse
+plus, +
+num, 9999
 ```
 
 ## Parser Generator / SLR Generator
