@@ -236,9 +236,12 @@ namespace ParserGenerator
                     }
             }
 
-#if false
-            // Print result
-            for (int i = 0; i < index_count; i++)
+            number_of_states = states.Count;
+        }
+        
+        public void PrintStates()
+        {
+            for (int i = 0; i < number_of_states; i++)
             {
                 var builder = new StringBuilder();
                 var x = $"I{i} => ";
@@ -247,17 +250,14 @@ namespace ParserGenerator
                 {
                     builder.Append("SHIFT{" + string.Join(",", shift_info[i].Select(y => $"({production_rules[y.Item1].production_name},I{y.Item2})")) + "}");
                     if (reduce_info.ContainsKey(i))
-                       builder.Append("\r\n" + "".PadLeft(x.Length) + "REDUCE{" + string.Join(",", reduce_info[i].Select(y => $"({(y.Item1 == -1 ? "$" : production_rules[y.Item1].production_name)},{(y.Item2 == 0 ? "accept" : production_rules[y.Item2].production_name)},{y.Item3})")) + "}");
+                        builder.Append("\r\n" + "".PadLeft(x.Length) + "REDUCE{" + string.Join(",", reduce_info[i].Select(y => $"({(y.Item1 == -1 ? "$" : production_rules[y.Item1].production_name)},{(y.Item2 == 0 ? "accept" : production_rules[y.Item2].production_name)},{y.Item3})")) + "}");
                 }
                 else if (reduce_info.ContainsKey(i))
                     builder.Append("REDUCE{" + string.Join(",", reduce_info[i].Select(y => $"({(y.Item1 == -1 ? "$" : production_rules[y.Item1].production_name)},{(y.Item2 == 0 ? "accept" : production_rules[y.Item2].production_name)},{y.Item3})")) + "}");
-                Console.WriteLine(builder.ToString());
+                Console.Console.Instance.WriteLine(builder.ToString());
             }
-#endif
-
-            number_of_states = states.Count;
         }
-
+        
         /// <summary>
         /// Calculate FIRST only Terminals
         /// </summary>
