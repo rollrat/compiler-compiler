@@ -70,6 +70,7 @@ factor |= id;
 
 gen.PushStarts(exp);
 gen.Generate();
+gen.PrintStates();
 ```
 
 ```
