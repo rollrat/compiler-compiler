@@ -127,10 +127,8 @@ factor |= id;
 factor |= func;
 func |= id + op_open + arguments + op_close;
 arguments |= id;
-arguments |= id + args_left;
+arguments |= arguments + split + id;
 arguments |= ParserGenerator.EmptyString;
-args_left |= split + arguments;
-args_left |= ParserGenerator.EmptyString;
 
 gen.PushStarts(exp);
 gen.Generate();
@@ -176,7 +174,6 @@ while (scanner2.Valid())
     insert(ss.Item1,ss.Item2);
 }
 insert("$", "$");
-
 ```
 
 ```
@@ -219,19 +216,21 @@ insert("$", "$");
      exp => exp plus term
      exp => 2 + 6*(6+4*7-2)
     args => id
-    args => b
-args_left => split args
-args_left => , b
-    args => id args_left
-    args => a ,b
+    args => a
+    args => args split id
+    args => a , b
+    args => args split id
+    args => a,b , c
+    args => args split id
+    args => a,b,c , d
     func => id op_open args op_close
-    func => sin ( a,b )
+    func => sin ( a,b,c,d )
   factor => func
-  factor => sin(a,b)
+  factor => sin(a,b,c,d)
     term => factor
-    term => sin(a,b)
+    term => sin(a,b,c,d)
      exp => exp plus term
-     exp => 2+6*(6+4*7-2) + sin(a,b)
+     exp => 2+6*(6+4*7-2) + sin(a,b,c,d)
     func => id op_open op_close
     func => cos ( )
   factor => func
@@ -243,5 +242,5 @@ args_left => , b
     term => term multiple factor
     term => cos() * pi
      exp => exp plus term
-     exp => 2+6*(6+4*7-2)+sin(a,b) + cos()*pi
+     exp => 2+6*(6+4*7-2)+sin(a,b,c,d) + cos()*pi
 ```
