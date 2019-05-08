@@ -146,7 +146,7 @@ namespace ParserGenerator
             for (int i = 0; i < production_rules.Count; i++)
                 if (!production_rules[i].isterminal)
                     for (int j = 0; j < production_rules[i].sub_productions.Count; j++)
-                        if (production_rules[i].sub_productions[j][0].index == -2)
+                        if (production_rules[i].sub_productions[j][0].index == EmptyString.index)
                             production_rules[i].sub_productions.RemoveAt(j--);
 
 #if false
