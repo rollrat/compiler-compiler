@@ -100,27 +100,41 @@ var gen = new ParserGenerator();
 var exp = gen.CreateNewProduction("exp", false);
 var term = gen.CreateNewProduction("term", false);
 var factor = gen.CreateNewProduction("factor", false);
+var func = gen.CreateNewProduction("func", false);
+var arguments = gen.CreateNewProduction("args", false);
+var args_left = gen.CreateNewProduction("args_left", false);
 
 // Terminals
-var plus = gen.CreateNewProduction("plus");
-var minus = gen.CreateNewProduction("minus");
-var multiple = gen.CreateNewProduction("multiple");
-var divide = gen.CreateNewProduction("divide");
-var id = gen.CreateNewProduction("id");
-var op_open = gen.CreateNewProduction("op_open");
-var op_close = gen.CreateNewProduction("op_close");
+var plus = gen.CreateNewProduction("plus");         // +
+var minus = gen.CreateNewProduction("minus");       // -
+var multiple = gen.CreateNewProduction("multiple"); // *
+var divide = gen.CreateNewProduction("divide");     // /
+var id = gen.CreateNewProduction("id");             // [_$a-zA-Z][_$a-zA-Z0-9]*
+var op_open = gen.CreateNewProduction("op_open");   // (
+var op_close = gen.CreateNewProduction("op_close"); // )
+var num = gen.CreateNewProduction("num");           // [0-9]+
+var split = gen.CreateNewProduction("split");       // ,
 
 exp |= exp + plus + term;
-//exp |= exp + minus + term;
+exp |= exp + minus + term;
 exp |= term;
 term |= term + multiple + factor;
-//term |= term + divide + factor;
+term |= term + divide + factor;
 term |= factor;
 factor |= op_open + exp + op_close;
+factor |= num;
 factor |= id;
+factor |= func;
+func |= id + op_open + arguments + op_close;
+arguments |= id;
+arguments |= id + args_left;
+arguments |= ParserGenerator.EmptyString;
+args_left |= split + arguments;
+args_left |= ParserGenerator.EmptyString;
 
 gen.PushStarts(exp);
 gen.Generate();
+gen.PrintStates();
 var slr = gen.CreateShiftReduceParserInstance();
 
 // 2*4+5$
@@ -139,7 +153,6 @@ Action<string, string> insert = (string x, string y) =>
     }
 };
 
-
 var sg2 = new ScannerGenerator();
 sg2.PushRule("", "[\\r\\n ]");
 sg2.PushRule("plus", "\\+");
@@ -148,53 +161,87 @@ sg2.PushRule("multiple", "\\*");
 sg2.PushRule("divide", "\\/");
 sg2.PushRule("op_open", "\\(");
 sg2.PushRule("op_close", "\\)");
+sg2.PushRule("split", ",");
 sg2.PushRule("id", "[a-z][a-z0-9]*");
 sg2.PushRule("num", "[0-9]+");
 sg2.Generate();
-sg2.PrintDiagram();
 sg2.CreateScannerInstance();
 
 var scanner2 = sg2.CreateScannerInstance();
-scanner2.AllocateTarget("2+6*(6+4*7)");
+scanner2.AllocateTarget("2+6*(6+4*7-2)+sin(a,b)+cos()*pi");
 
 while (scanner2.Valid())
 {
     var ss = scanner2.Next();
     insert(ss.Item1,ss.Item2);
 }
+insert("$", "$");
+
 ```
 
 ```
-  factor => id
+  factor => num
   factor => 2
     term => factor
     term => 2
      exp => term
      exp => 2
-  factor => id
-  factor => 4
+  factor => num
+  factor => 6
     term => factor
-    term => 4
-  factor => id
+    term => 6
+  factor => num
   factor => 6
     term => factor
     term => 6
      exp => term
      exp => 6
-  factor => id
+  factor => num
   factor => 4
     term => factor
     term => 4
-  factor => id
+  factor => num
   factor => 7
     term => term multiple factor
     term => 4 * 7
      exp => exp plus term
      exp => 6 + 4*7
+  factor => num
+  factor => 2
+    term => factor
+    term => 2
+     exp => exp minus term
+     exp => 6+4*7 - 2
   factor => op_open exp op_close
-  factor => ( 6+4*7 )
+  factor => ( 6+4*7-2 )
     term => term multiple factor
-    term => 4 * (6+4*7)
+    term => 6 * (6+4*7-2)
      exp => exp plus term
-     exp => 2 + 4*(6+4*7)
+     exp => 2 + 6*(6+4*7-2)
+    args => id
+    args => b
+args_left => split args
+args_left => , b
+    args => id args_left
+    args => a ,b
+    func => id op_open args op_close
+    func => sin ( a,b )
+  factor => func
+  factor => sin(a,b)
+    term => factor
+    term => sin(a,b)
+     exp => exp plus term
+     exp => 2+6*(6+4*7-2) + sin(a,b)
+    func => id op_open op_close
+    func => cos ( )
+  factor => func
+  factor => cos()
+    term => factor
+    term => cos()
+  factor => id
+  factor => pi
+    term => term multiple factor
+    term => cos() * pi
+     exp => exp plus term
+     exp => 2+6*(6+4*7-2)+sin(a,b) + cos()*pi
 ```
