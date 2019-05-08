@@ -142,6 +142,13 @@ namespace ParserGenerator
                             foreach (var r in FOLLOW[i])
                                 FOLLOW[rule.Last().index].Add(r);
 
+            // 4. Delete EmptyString Production
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    for (int j = 0; j < production_rules[i].sub_productions.Count; j++)
+                        if (production_rules[i].sub_productions[j][0].index == -2)
+                            production_rules[i].sub_productions.RemoveAt(j--);
+
 #if false
             print_hs(FIRST, "FIRST");
             print_hs(FOLLOW, "FOLLOW");
