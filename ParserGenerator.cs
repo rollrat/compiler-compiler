@@ -380,6 +380,33 @@ namespace ParserGenerator
             return new ShiftReduceParser(symbol_table, jump_table, goto_table, grammar_group.ToArray(), grammar.Select(x => x.ToArray()).ToArray());
         }
     }
+    
+    public class ParsingTree
+    {
+        public class ParsingTreeNode
+        {
+            public string Produnction;
+            public string Contents;
+            public ParsingTreeNode Parent;
+            public List<ParsingTreeNode> Childs;
+            
+            public static ParsingTreeNode NewNode()
+                => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>() };
+            public static ParsingTreeNode NewNode(string production)
+                => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>(), Produnction = production };
+            public static ParsingTreeNode NewNode(string production, string contents)
+                => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>(), Produnction = production, Contents = contents };
+        }
+
+        int tree_index;
+        ParsingTreeNode root;
+
+        public ParsingTree(int index = 0)
+        {
+            tree_index = index;
+        }
+
+    }
 
     /// <summary>
     /// Shift-Reduce Parser for LR(1)
@@ -391,6 +418,7 @@ namespace ParserGenerator
         Stack<int> state_stack = new Stack<int>();
         Stack<int> production_stack = new Stack<int>();
         Stack<string> contents_stack = new Stack<string>();
+        Stack<ParsingTree.ParsingTreeNode> treenode_stack = new Stack<ParsingTree.ParsingTreeNode>();
 
         // 3       1      2       0
         // Accept? Shift? Reduce? Error?
@@ -434,6 +462,7 @@ namespace ParserGenerator
                     state_stack.Clear();
                     production_stack.Clear();
                     contents_stack.Clear();
+                    treenode_stack.Clear();
                     latest_error = true;
                     break;
 
@@ -442,6 +471,7 @@ namespace ParserGenerator
                     state_stack.Push(goto_table[state_stack.Peek()][index]);
                     production_stack.Push(index);
                     contents_stack.Push(contents);
+                    treenode_stack.Push(ParsingTree.ParsingTreeNode.NewNode(symbol_index_name[index], contents));
                     break;
 
                 case 2:
@@ -455,25 +485,28 @@ namespace ParserGenerator
                     break;
             }
         }
-
-        List<Tuple<int,string>> reduce_nodes = new List<Tuple<int, string>>();
-        public List<Tuple<string,string>> LastestReduce() => reduce_nodes.Select(x => new Tuple<string,string>( symbol_index_name[x.Item1], x.Item2)).ToList();
+        
+        public ParsingTree.ParsingTreeNode LatestReduce() => treenode_stack.Peek();
         private void reduce(int index)
         {
             var reduce_production = goto_table[state_stack.Peek()][index];
+            var reduce_treenodes = new List<ParsingTree.ParsingTreeNode>();
 
             // Reduce Stack
-            reduce_nodes.Clear();
             for (int i = 0; i < production[reduce_production].Length; i++)
             {
                 state_stack.Pop();
-                reduce_nodes.Insert(0, new Tuple<int, string> (production_stack.Pop(), contents_stack.Pop()));
+                reduce_treenodes.Insert(0, treenode_stack.Pop());
             }
-            reduce_nodes.Insert(0, new Tuple<int, string>(group_table[reduce_production], ""));
 
             state_stack.Push(goto_table[state_stack.Peek()][group_table[reduce_production]]);
             production_stack.Push(group_table[reduce_production]);
-            contents_stack.Push(string.Join("", reduce_nodes.Select(x => x.Item2)));
+
+            var reduction_parent = ParsingTree.ParsingTreeNode.NewNode(symbol_index_name[group_table[reduce_production]]);
+            reduce_treenodes.ForEach(x => x.Parent = reduction_parent);
+            reduction_parent.Contents = string.Join("", reduce_treenodes.Select(x => x.Contents));
+            reduction_parent.Childs = reduce_treenodes;
+            treenode_stack.Push(reduction_parent);
         }
     }
 }
