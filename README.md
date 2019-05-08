@@ -130,17 +130,15 @@ Action<string, string> insert = (string x, string y) =>
     slr.Insert(x, y);
     while (slr.Reduce())
     {
-        var l = slr.LastestReduce();
-        Console.Instance.Write(l[0].Item1.PadLeft(8) + " => ");
-        l.RemoveAt(0);
-        Console.Instance.WriteLine(string.Join(" ", l.Select(z => z.Item1)));
-        l = slr.LastestReduce();
-        Console.Instance.Write(l[0].Item1.PadLeft(8) + " => ");
-        l.RemoveAt(0);
-        Console.Instance.WriteLine(string.Join(" ", l.Select(z => z.Item2)));
+        var l = slr.LatestReduce();
+        Console.Instance.Write(l.Produnction.PadLeft(8) + " => ");
+        Console.Instance.WriteLine(string.Join(" ", l.Childs.Select(z => z.Produnction)));
+        Console.Instance.Write(l.Produnction.PadLeft(8) + " => ");
+        Console.Instance.WriteLine(string.Join(" ", l.Childs.Select(z => z.Contents)));
         slr.Insert(x, y);
     }
 };
+
 
 var sg2 = new ScannerGenerator();
 sg2.PushRule("", "[\\r\\n ]");
