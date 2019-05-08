@@ -107,6 +107,26 @@ namespace ParserGenerator
         /// </summary>
         public void Generate()
         {
+            // --------------- Expand EmptyString ---------------
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    for (int j = 0; j < production_rules[i].sub_productions.Count; j++)
+                        if (production_rules[i].sub_productions[j][0].index == EmptyString.index)
+                        {
+                            production_rules[i].sub_productions.RemoveAt(j--);
+                            for (int ii = 0; ii < production_rules.Count; ii++)
+                                if (!production_rules[ii].isterminal)
+                                    for (int jj = 0; jj < production_rules[ii].sub_productions.Count; jj++)
+                                        for (int kk = 0; kk < production_rules[ii].sub_productions[jj].Count; kk++)
+                                            if (production_rules[ii].sub_productions[jj][kk].index == production_rules[i].index)
+                                            {
+                                                var ll = new List<ParserProduction>(production_rules[ii].sub_productions[jj]);
+                                                ll.RemoveAt(kk);
+                                                production_rules[ii].sub_productions.Add(ll);
+                                            }
+                        }
+            // --------------------------------------------------
+
             // --------------- Collect FIRST,FOLLOW Set ---------------
             var FIRST = new List<HashSet<int>>();
             foreach (var rule in production_rules)
@@ -141,13 +161,6 @@ namespace ParserGenerator
                         if (rule.Last().isterminal == false)
                             foreach (var r in FOLLOW[i])
                                 FOLLOW[rule.Last().index].Add(r);
-
-            // 4. Delete EmptyString Production
-            for (int i = 0; i < production_rules.Count; i++)
-                if (!production_rules[i].isterminal)
-                    for (int j = 0; j < production_rules[i].sub_productions.Count; j++)
-                        if (production_rules[i].sub_productions[j][0].index == EmptyString.index)
-                            production_rules[i].sub_productions.RemoveAt(j--);
 
 #if false
             print_hs(FIRST, "FIRST");
