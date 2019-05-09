@@ -62,7 +62,7 @@ namespace ParserGenerator
         public ParserGenerator()
         {
             production_rules = new List<ParserProduction>();
-            production_rules.Add(new ParserProduction { index = 0 });
+            production_rules.Add(new ParserProduction { index = 0, production_name = "S'" });
         }
         
         public ParserProduction CreateNewProduction(string name = "", bool is_terminal = true)
@@ -78,9 +78,17 @@ namespace ParserGenerator
             production_rules[0].sub_productions.Add(new List<ParserProduction> { pp });
         }
 
+        #region String Hash Function
         private string t2s(Tuple<int, int, int> t)
         {
             return $"{t.Item1},{t.Item2},{t.Item3}";
+        }
+
+        private string t2s(Tuple<int, int, int, HashSet<int>> t)
+        {
+            var list = t.Item4.ToList();
+            list.Sort();
+            return $"{t.Item1},{t.Item2},{t.Item3},({string.Join(",",list)})";
         }
 
         private string l2s(List<Tuple<int,int,int>> h)
@@ -90,6 +98,25 @@ namespace ParserGenerator
             return string.Join(",", list.Select(x => $"({x.Item1},{x.Item2},{x.Item3})"));
         }
 
+        private string l2s(List<Tuple<int, int, int, HashSet<int>>> h)
+        {
+            var list = new List<Tuple<int, int, int, List<int>>>();
+            foreach (var tt in h)
+            {
+                var ll = tt.Item4.ToList();
+                ll.Sort();
+                list.Add(new Tuple<int, int, int, List<int>>( tt.Item1, tt.Item2, tt.Item3, ll));
+            }
+            list.Sort();
+            return string.Join(",", list.Select(x => $"({x.Item1},{x.Item2},{x.Item3},({(string.Join("/",x.Item4))}))"));
+        }
+
+        private string i2s(int a, int b, int c)
+        {
+            return $"{a},{b},{c}";
+        }
+        #endregion
+
         private void print_hs(List<HashSet<int>> lhs, string prefix)
         {
             for (int i = 0; i < lhs.Count; i++)
@@ -98,10 +125,37 @@ namespace ParserGenerator
                         $"{prefix}({production_rules[i].production_name})={{{string.Join(",", lhs[i].ToList().Select(x => x == -1 ? "$" : production_rules[x].production_name))}}}");
         }
 
+        private void print_states(int state, List<Tuple<int, int, int, HashSet<int>>> items)
+        {
+            var builder = new StringBuilder();
+            builder.Append("-----" + "I" + state + "-----\r\n");
+
+            foreach (var item in items)
+            {
+                builder.Append($"{production_rules[item.Item1].production_name.ToString().PadLeft(10)} -> ");
+
+                var builder2 = new StringBuilder();
+                for (int i = 0; i < production_rules[item.Item1].sub_productions[item.Item2].Count; i++)
+                {
+                    if (i == item.Item3)
+                        builder2.Append("·");
+                    builder2.Append(production_rules[item.Item1].sub_productions[item.Item2][i].production_name + " ");
+                    if (item.Item3 == production_rules[item.Item1].sub_productions[item.Item2].Count && i == item.Item3 - 1)
+                        builder2.Append("·");
+                }
+                builder.Append(builder2.ToString().PadRight(30));
+
+                builder.Append($"{string.Join("/", item.Item4.ToList().Select(x => x == -1 ? "$":production_rules[x].production_name))}\r\n");
+            }
+
+            Console.WriteLine(builder.ToString());
+        }
+
         int number_of_states = -1;
         Dictionary<int, List<Tuple<int, int>>> shift_info;
         Dictionary<int, List<Tuple<int, int, int>>> reduce_info;
 
+        #region SLR Generator
         /// <summary>
         /// Generate SimpleLR Table
         /// </summary>
@@ -160,7 +214,8 @@ namespace ParserGenerator
                     foreach (var rule in production_rules[i].sub_productions)
                         if (rule.Last().isterminal == false)
                             foreach (var r in FOLLOW[i])
-                                FOLLOW[rule.Last().index].Add(r);
+                                if (rule.Last().index > 0)
+                                    FOLLOW[rule.Last().index].Add(r);
 
 #if false
             print_hs(FIRST, "FIRST");
@@ -255,10 +310,168 @@ namespace ParserGenerator
                             reduce_info[p].Add(new Tuple<int, int, int>(term, transition.Item1, transition.Item2));
                     }
             }
-
+            
             number_of_states = states.Count;
         }
-        
+        #endregion
+
+        #region LR(1) Generator
+        /// <summary>
+        /// Generate LR(1) Table
+        /// </summary>
+        public void GenerateLR1()
+        {
+            // --------------- Expand EmptyString ---------------
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    for (int j = 0; j < production_rules[i].sub_productions.Count; j++)
+                        if (production_rules[i].sub_productions[j][0].index == EmptyString.index)
+                        {
+                            production_rules[i].sub_productions.RemoveAt(j--);
+                            for (int ii = 0; ii < production_rules.Count; ii++)
+                                if (!production_rules[ii].isterminal)
+                                    for (int jj = 0; jj < production_rules[ii].sub_productions.Count; jj++)
+                                        for (int kk = 0; kk < production_rules[ii].sub_productions[jj].Count; kk++)
+                                            if (production_rules[ii].sub_productions[jj][kk].index == production_rules[i].index)
+                                            {
+                                                var ll = new List<ParserProduction>(production_rules[ii].sub_productions[jj]);
+                                                ll.RemoveAt(kk);
+                                                production_rules[ii].sub_productions.Add(ll);
+                                            }
+                        }
+            // --------------------------------------------------
+
+            // --------------- Collect FIRST,FOLLOW Set ---------------
+            var FIRST = new List<HashSet<int>>();
+            foreach (var rule in production_rules)
+                FIRST.Add(first_terminals(rule.index));
+
+            var FOLLOW = new List<HashSet<int>>();
+            for (int i = 0; i < production_rules.Count; i++)
+                FOLLOW.Add(new HashSet<int>());
+            FOLLOW[0].Add(-1); // -1: Sentinel
+
+            // 1. B -> a A b, Add FIRST(b) to FOLLOW(A)
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    foreach (var rule in production_rules[i].sub_productions)
+                        for (int j = 0; j < rule.Count - 1; j++)
+                            if (rule[j].isterminal == false || rule[j + 1].isterminal)
+                                foreach (var r in FIRST[rule[j + 1].index])
+                                    FOLLOW[rule[j].index].Add(r);
+
+            // 2. B -> a A b and empty -> FIRST(b), Add FOLLOW(B) to FOLLOW(A)
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    foreach (var rule in production_rules[i].sub_productions)
+                        if (rule.Count > 2 && rule[rule.Count - 2].isterminal == false && FIRST[rule.Last().index].Contains(EmptyString.index))
+                            foreach (var r in FOLLOW[i])
+                                FOLLOW[rule[rule.Count - 2].index].Add(r);
+
+            // 3. B -> a A, Add FOLLOW(B) to FOLLOW(A)
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    foreach (var rule in production_rules[i].sub_productions)
+                        if (rule.Last().isterminal == false)
+                            foreach (var r in FOLLOW[i])
+                                if (rule.Last().index > 0)
+                                    FOLLOW[rule.Last().index].Add(r);
+            // --------------------------------------------------------
+
+            // (state_index, (production_rule_index, sub_productions_pos, dot_position, (lookahead))
+            var states = new Dictionary<int, List<Tuple<int, int, int, HashSet<int>>>>();
+            // (state_specify, state_index)
+            var state_index = new Dictionary<string, int>();
+            // (state_index, (reduce_what, state_index))
+            shift_info = new Dictionary<int, List<Tuple<int, int>>>();
+            // (state_index, (shift_what, production_rule_index, sub_productions_pos))
+            reduce_info = new Dictionary<int, List<Tuple<int, int, int>>>();
+            var index_count = 0;
+
+            // -------------------- Put first eater -------------------
+            var first_l = first_with_lookahead(0,0,0,new HashSet<int>());
+            state_index.Add(l2s(first_l), 0);
+            states.Add(0, first_l);
+            // --------------------------------------------------------
+
+            // Create all LR states
+            // (states)
+            var q = new Queue<int>();
+            q.Enqueue(index_count++);
+            while (q.Count != 0)
+            {
+                var p = q.Dequeue();
+
+                // Collect goto
+                // (state_index, (production_rule_index, sub_productions_pos, dot_position, lookahead))
+                var gotos = new Dictionary<int, List<Tuple<int, int, int, HashSet<int>>>>();
+                foreach (var transition in states[p])
+                    if (production_rules[transition.Item1].sub_productions[transition.Item2].Count > transition.Item3)
+                    {
+                        var pi = production_rules[transition.Item1].sub_productions[transition.Item2][transition.Item3].index;
+                        if (!gotos.ContainsKey(pi))
+                            gotos.Add(pi, new List<Tuple<int, int, int, HashSet<int>>>());
+                        gotos[pi].Add(new Tuple<int, int, int, HashSet<int>>(transition.Item1, transition.Item2, transition.Item3 + 1, transition.Item4));
+                    }
+
+                // Populate empty-string closure
+                foreach (var goto_unit in gotos)
+                {
+                    var set = new HashSet<string>();
+                    // Push exists transitions
+                    foreach (var psd in goto_unit.Value)
+                        set.Add(t2s(psd));
+                    // Find all transitions
+                    var new_trans = new List<Tuple<int, int, int, HashSet<int>>>();
+                    foreach (var psd in goto_unit.Value)
+                    {
+                        if (production_rules[psd.Item1].sub_productions[psd.Item2].Count == psd.Item3) continue;
+                        if (production_rules[psd.Item1].sub_productions[psd.Item2][psd.Item3].isterminal) continue;
+                        var first_nt = first_with_lookahead(psd.Item1, psd.Item2, psd.Item3, psd.Item4);
+                        foreach (var nts in first_nt)
+                            if (!set.Contains(t2s(nts)))
+                            {
+                                new_trans.Add(nts);
+                                set.Add(t2s(nts));
+                            }
+                    }
+                    goto_unit.Value.AddRange(new_trans);
+                }
+
+                // Build shift transitions ignore terminal, non-terminal
+                foreach (var pp in gotos)
+                {
+                    var hash = l2s(pp.Value);
+                    if (!state_index.ContainsKey(hash))
+                    {
+                        states.Add(index_count, pp.Value);
+                        state_index.Add(hash, index_count);
+                        q.Enqueue(index_count++);
+                    }
+                    var index = state_index[hash];
+
+                    if (!shift_info.ContainsKey(p))
+                        shift_info.Add(p, new List<Tuple<int, int>>());
+                    shift_info[p].Add(new Tuple<int, int>(pp.Key, index));
+                }
+
+                // Check require reduce and build reduce transitions
+                foreach (var transition in states[p])
+                    if (production_rules[transition.Item1].sub_productions[transition.Item2].Count == transition.Item3)
+                    {
+                        if (!reduce_info.ContainsKey(p))
+                            reduce_info.Add(p, new List<Tuple<int, int, int>>());
+                        foreach (var term in FOLLOW[transition.Item1])
+                            reduce_info[p].Add(new Tuple<int, int, int>(term, transition.Item1, transition.Item2));
+                    }
+            }
+
+            number_of_states = states.Count;
+            foreach (var s in states)
+                print_states(s.Key, s.Value);
+        }
+        #endregion
+
         public void PrintStates()
         {
             for (int i = 0; i < number_of_states; i++)
@@ -277,7 +490,7 @@ namespace ParserGenerator
                 Console.WriteLine(builder.ToString());
             }
         }
-        
+
         /// <summary>
         /// Calculate FIRST only Terminals
         /// </summary>
@@ -294,7 +507,7 @@ namespace ParserGenerator
             while (q.Count != 0)
             {
                 var p = q.Dequeue();
-                if (visit[p]) continue;
+                if (p < 0 || visit[p]) continue;
                 visit[p] = true;
 
                 if (p < 0 || production_rules[p].isterminal)
@@ -305,7 +518,7 @@ namespace ParserGenerator
 
             return result;
         }
-
+        
         /// <summary>
         /// Calculate FIRST only Non-Terminals
         /// </summary>
@@ -339,6 +552,83 @@ namespace ParserGenerator
                 }
             }
             return first_l;
+        }
+        
+        /// <summary>
+        /// Get lookahead states item with first item's closure
+        /// This function is used in first_with_lookahead function. 
+        /// -1: Sentinel lookahead
+        /// </summary>
+        /// <param name="production_rule_index"></param>
+        /// <returns></returns>
+        private List<Tuple<int,int,int,HashSet<int>>> lookahead_with_first(int production_rule_index, int sub_production, int sub_production_index, HashSet<int> pred)
+        {
+            // (production_rule_index, sub_productions_pos, dot_position, (lookahead))
+            var states = new List<Tuple<int, int, int, HashSet<int>>>();
+            // (production_rule_index, (sub_productions_pos))
+            var first_visit = new Dictionary<int, HashSet<int>>();
+            states.Add(new Tuple<int, int, int, HashSet<int>>(production_rule_index, sub_production, sub_production_index, pred));
+            if (production_rule_index == 0 && sub_production == 0 && sub_production_index == 0)
+                pred.Add(-1); // Push sentinel
+            if (production_rules[production_rule_index].sub_productions[sub_production].Count > sub_production_index)
+            {
+                if (!production_rules[production_rule_index].sub_productions[sub_production][sub_production_index].isterminal)
+                {
+                    var index_populate = production_rules[production_rule_index].sub_productions[sub_production][sub_production_index].index;
+                    if (production_rules[production_rule_index].sub_productions[sub_production].Count <= sub_production_index + 1)
+                    {
+                        for (int i = 0; i < production_rules[index_populate].sub_productions.Count; i++)
+                            states.Add(new Tuple<int, int, int, HashSet<int>>(index_populate, i, 0, new HashSet<int>(pred)));
+                    }
+                    else
+                    {
+                        var first_lookahead = first_terminals(production_rules[production_rule_index].sub_productions[sub_production][sub_production_index + 1].index);
+                        for (int i = 0; i < production_rules[index_populate].sub_productions.Count; i++)
+                            states.Add(new Tuple<int, int, int, HashSet<int>>(index_populate, i, 0, new HashSet<int>(first_lookahead)));
+                    }
+                }
+            }
+            return states;
+        }
+
+        /// <summary>
+        /// Get FIRST items with lookahead (Build specific states completely)
+        /// </summary>
+        /// <param name="production_rule_index"></param>
+        /// <param name="sub_production"></param>
+        /// <param name="sub_production_index"></param>
+        /// <param name="pred"></param>
+        /// <returns></returns>
+        private List<Tuple<int, int, int, HashSet<int>>> first_with_lookahead(int production_rule_index, int sub_production, int sub_production_index, HashSet<int> pred)
+        {
+            // (production_rule_index, sub_productions_pos, dot_position, (lookahead))
+            var states = new List<Tuple<int, int, int, HashSet<int>>>();
+            // (production_rule_index + sub_productions_pos + dot_position), (states_index)
+            var states_prefix = new Dictionary<string, int>();
+
+            var q = new Queue<List<Tuple<int, int, int, HashSet<int>>>>();
+            q.Enqueue(lookahead_with_first(production_rule_index, sub_production, sub_production_index, pred));
+            while (q.Count != 0)
+            {
+                var ll = q.Dequeue();
+                foreach (var e in ll)
+                {
+                    var ii = i2s(e.Item1, e.Item2, e.Item3);
+                    if (!states_prefix.ContainsKey(ii))
+                    {
+                        states_prefix.Add(ii, states.Count);
+                        states.Add(e);
+                        q.Enqueue(lookahead_with_first(e.Item1, e.Item2, e.Item3, e.Item4));
+                    }
+                    else
+                    {
+                        foreach (var hse in e.Item4)
+                            states[states_prefix[ii]].Item4.Add(hse);
+                    }
+                }
+            }
+
+            return states;
         }
 
         public ShiftReduceParser CreateShiftReduceParserInstance()
@@ -400,7 +690,7 @@ namespace ParserGenerator
             return new ShiftReduceParser(symbol_table, jump_table, goto_table, grammar_group.ToArray(), grammar.Select(x => x.ToArray()).ToArray());
         }
     }
-    
+
     public class ParsingTree
     {
         public class ParsingTreeNode
@@ -425,7 +715,7 @@ namespace ParserGenerator
         {
             tree_index = index;
         }
-
+        
     }
 
     /// <summary>
@@ -436,8 +726,6 @@ namespace ParserGenerator
         Dictionary<string, int> symbol_name_index = new Dictionary<string, int>();
         List<string> symbol_index_name = new List<string>();
         Stack<int> state_stack = new Stack<int>();
-        Stack<int> production_stack = new Stack<int>();
-        Stack<string> contents_stack = new Stack<string>();
         Stack<ParsingTree.ParsingTreeNode> treenode_stack = new Stack<ParsingTree.ParsingTreeNode>();
 
         // 3       1      2       0
@@ -480,8 +768,6 @@ namespace ParserGenerator
                 case 0:
                     // Panic mode
                     state_stack.Clear();
-                    production_stack.Clear();
-                    contents_stack.Clear();
                     treenode_stack.Clear();
                     latest_error = true;
                     break;
@@ -489,8 +775,6 @@ namespace ParserGenerator
                 case 1:
                     // Shift
                     state_stack.Push(goto_table[state_stack.Peek()][index]);
-                    production_stack.Push(index);
-                    contents_stack.Push(contents);
                     treenode_stack.Push(ParsingTree.ParsingTreeNode.NewNode(symbol_index_name[index], contents));
                     break;
 
@@ -520,7 +804,6 @@ namespace ParserGenerator
             }
 
             state_stack.Push(goto_table[state_stack.Peek()][group_table[reduce_production]]);
-            production_stack.Push(group_table[reduce_production]);
 
             var reduction_parent = ParsingTree.ParsingTreeNode.NewNode(symbol_index_name[group_table[reduce_production]]);
             reduce_treenodes.ForEach(x => x.Parent = reduction_parent);
