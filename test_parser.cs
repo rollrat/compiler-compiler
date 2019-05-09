@@ -38,9 +38,10 @@ namespace ParserGenerator {
             factor |= id;
             factor |= func;
             func |= id + op_open + arguments + op_close;
-            arguments |= id;
-            arguments |= arguments + split + id;
+            arguments |= args_left + id ;
             arguments |= ParserGenerator.EmptyString;
+            args_left |= args_left + id + split;
+            args_left |= ParserGenerator.EmptyString;
 
             gen.PushStarts(exp);
             gen.Generate();
