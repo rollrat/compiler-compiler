@@ -321,24 +321,12 @@ namespace ParserGenerator
         /// </summary>
         public void GenerateLR1()
         {
-            // --------------- Expand EmptyString ---------------
+            // --------------- Delete EmptyString ---------------
             for (int i = 0; i < production_rules.Count; i++)
                 if (!production_rules[i].isterminal)
                     for (int j = 0; j < production_rules[i].sub_productions.Count; j++)
                         if (production_rules[i].sub_productions[j][0].index == EmptyString.index)
-                        {
-                            production_rules[i].sub_productions.RemoveAt(j--);
-                            for (int ii = 0; ii < production_rules.Count; ii++)
-                                if (!production_rules[ii].isterminal)
-                                    for (int jj = 0; jj < production_rules[ii].sub_productions.Count; jj++)
-                                        for (int kk = 0; kk < production_rules[ii].sub_productions[jj].Count; kk++)
-                                            if (production_rules[ii].sub_productions[jj][kk].index == production_rules[i].index)
-                                            {
-                                                var ll = new List<ParserProduction>(production_rules[ii].sub_productions[jj]);
-                                                ll.RemoveAt(kk);
-                                                production_rules[ii].sub_productions.Add(ll);
-                                            }
-                        }
+                            production_rules[i].sub_productions[j].Clear();
             // --------------------------------------------------
 
             // --------------- Collect FIRST,FOLLOW Set ---------------
@@ -372,7 +360,7 @@ namespace ParserGenerator
             for (int i = 0; i < production_rules.Count; i++)
                 if (!production_rules[i].isterminal)
                     foreach (var rule in production_rules[i].sub_productions)
-                        if (rule.Last().isterminal == false)
+                        if (rule.Count > 0 && rule.Last().isterminal == false)
                             foreach (var r in FOLLOW[i])
                                 if (rule.Last().index > 0)
                                     FOLLOW[rule.Last().index].Add(r);
@@ -461,7 +449,9 @@ namespace ParserGenerator
                     {
                         if (!reduce_info.ContainsKey(p))
                             reduce_info.Add(p, new List<Tuple<int, int, int>>());
-                        foreach (var term in FOLLOW[transition.Item1])
+                        //foreach (var term in FOLLOW[transition.Item1])
+                        //    reduce_info[p].Add(new Tuple<int, int, int>(term, transition.Item1, transition.Item2));
+                        foreach (var term in transition.Item4)
                             reduce_info[p].Add(new Tuple<int, int, int>(term, transition.Item1, transition.Item2));
                     }
             }
@@ -513,7 +503,7 @@ namespace ParserGenerator
                 if (p < 0 || production_rules[p].isterminal)
                     result.Add(p);
                 else
-                    production_rules[p].sub_productions.ForEach(x => q.Enqueue(x[0].index));
+                    production_rules[p].sub_productions.Where(x => x.Count > 0).ToList().ForEach(y => q.Enqueue(y[0].index));
             }
 
             return result;
@@ -590,7 +580,7 @@ namespace ParserGenerator
             }
             return states;
         }
-       
+
         /// <summary>
         /// Get FIRST items with lookahead (Build specific states completely)
         /// </summary>
@@ -792,6 +782,8 @@ namespace ParserGenerator
         public bool Accept() => state_stack.Count == 0;
         public bool Error() => latest_error;
         public bool Reduce() => latest_reduce;
+
+        public string Stack() => string.Join(" ", state_stack);
         
         public void Insert(string token_name, string contents) => Insert(symbol_name_index[token_name], contents);
         public void Insert(int index, string contents)
