@@ -274,7 +274,7 @@ namespace ParserGenerator
                 }
                 else if (reduce_info.ContainsKey(i))
                     builder.Append("REDUCE{" + string.Join(",", reduce_info[i].Select(y => $"({(y.Item1 == -1 ? "$" : production_rules[y.Item1].production_name)},{(y.Item2 == 0 ? "accept" : production_rules[y.Item2].production_name)},{y.Item3})")) + "}");
-                Console.Console.Instance.WriteLine(builder.ToString());
+                Console.WriteLine(builder.ToString());
             }
         }
         
