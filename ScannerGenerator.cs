@@ -547,6 +547,9 @@ namespace ParserGenerator
                         dic[dd.Item1].Add(dd.Item2);
                     else
                         dic.Add(dd.Item1, new HashSet<int> { dd.Item2 });
+                    foreach (var node in dia.nodes[dd.Item2].transition)
+                        if (node.Item1 == 0)
+                            dic[dd.Item1].Add(node.Item2.index);
                 }
 
                 foreach (var p in dic)
