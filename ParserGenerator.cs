@@ -56,6 +56,10 @@ namespace ParserGenerator
     public class ParserGenerator
     {
         List<ParserProduction> production_rules;
+        // (production_index, (priority, is_left_associativity?))
+        Dictionary<int, Tuple<int, bool>> shift_reduce_conflict_solve;
+        // (production_index, (sub_production_index, (priority, is_left_associativity?)))
+        Dictionary<int, Dictionary<int, Tuple<int, bool>>> shift_reduce_conflict_solve_with_production_rule;
 
         public readonly static ParserProduction EmptyString = new ParserProduction { index = -2 };
 
@@ -63,6 +67,8 @@ namespace ParserGenerator
         {
             production_rules = new List<ParserProduction>();
             production_rules.Add(new ParserProduction { index = 0, production_name = "S'" });
+            shift_reduce_conflict_solve = new Dictionary<int, Tuple<int, bool>>();
+            shift_reduce_conflict_solve_with_production_rule = new Dictionary<int, Dictionary<int, Tuple<int, bool>>>();
         }
         
         public ParserProduction CreateNewProduction(string name = "", bool is_terminal = true)
@@ -76,6 +82,24 @@ namespace ParserGenerator
         {
             // Augment stats node
             production_rules[0].sub_productions.Add(new List<ParserProduction> { pp });
+        }
+
+        public void PushConflictSolver(bool left, params ParserProduction[] terminals)
+        {
+            var priority = shift_reduce_conflict_solve.Count + shift_reduce_conflict_solve_with_production_rule.Count;
+            foreach (var pp in terminals)
+                shift_reduce_conflict_solve.Add(pp.index, new Tuple<int, bool>(priority, left));
+        }
+
+        public void PushConflictSolver(bool left, params Tuple<ParserProduction, int>[] no)
+        {
+            var priority = shift_reduce_conflict_solve.Count + shift_reduce_conflict_solve_with_production_rule.Count;
+            foreach (var ppi in no)
+            {
+                if (!shift_reduce_conflict_solve_with_production_rule.ContainsKey(ppi.Item1.index))
+                    shift_reduce_conflict_solve_with_production_rule.Add(ppi.Item1.index, new Dictionary<int, Tuple<int, bool>>());
+                shift_reduce_conflict_solve_with_production_rule[ppi.Item1.index].Add(ppi.Item2, new Tuple<int, bool>(priority, left));
+            }
         }
 
         #region String Hash Function
@@ -146,6 +170,37 @@ namespace ParserGenerator
                 builder.Append(builder2.ToString().PadRight(30));
 
                 builder.Append($"{string.Join("/", item.Item4.ToList().Select(x => x == -1 ? "$":production_rules[x].production_name))}\r\n");
+            }
+
+            Console.WriteLine(builder.ToString());
+        }
+
+        private void print_merged_states(int state, List<Tuple<int, int, int, HashSet<int>>> items, List<List<List<int>>> external_gotos)
+        {
+            var builder = new StringBuilder();
+            builder.Append("-----" + "I" + state + "-----\r\n");
+
+            for (int j = 0; j < items.Count; j++)
+            {
+                var item = items[j];
+
+                builder.Append($"{production_rules[item.Item1].production_name.ToString().PadLeft(10)} -> ");
+
+                var builder2 = new StringBuilder();
+                for (int i = 0; i < production_rules[item.Item1].sub_productions[item.Item2].Count; i++)
+                {
+                    if (i == item.Item3)
+                        builder2.Append("·");
+                    builder2.Append(production_rules[item.Item1].sub_productions[item.Item2][i].production_name + " ");
+                    if (item.Item3 == production_rules[item.Item1].sub_productions[item.Item2].Count && i == item.Item3 - 1)
+                        builder2.Append("·");
+                }
+                builder.Append(builder2.ToString().PadRight(30));
+
+                builder.Append($"[{string.Join("/", item.Item4.ToList().Select(x => x == -1 ? "$" : production_rules[x].production_name))}] ");
+                for (int i = 0; i < external_gotos.Count; i++)
+                    builder.Append($"[{string.Join("/", external_gotos[i][j].ToList().Select(x => x == -1 ? "$" : production_rules[x].production_name))}] ");
+                builder.Append("\r\n");
             }
 
             Console.WriteLine(builder.ToString());
@@ -449,18 +504,295 @@ namespace ParserGenerator
                     {
                         if (!reduce_info.ContainsKey(p))
                             reduce_info.Add(p, new List<Tuple<int, int, int>>());
-                        //foreach (var term in FOLLOW[transition.Item1])
-                        //    reduce_info[p].Add(new Tuple<int, int, int>(term, transition.Item1, transition.Item2));
                         foreach (var term in transition.Item4)
                             reduce_info[p].Add(new Tuple<int, int, int>(term, transition.Item1, transition.Item2));
                     }
             }
 
             number_of_states = states.Count;
+#if false
             foreach (var s in states)
                 print_states(s.Key, s.Value);
+#endif
         }
         #endregion
+
+        #region LALR Generator
+        /// <summary>
+        /// Generate LALR Table
+        /// </summary>
+        public void GenerateLALR()
+        {
+            // --------------- Delete EmptyString ---------------
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    for (int j = 0; j < production_rules[i].sub_productions.Count; j++)
+                        if (production_rules[i].sub_productions[j][0].index == EmptyString.index)
+                            production_rules[i].sub_productions[j].Clear();
+            // --------------------------------------------------
+
+            // --------------- Collect FIRST,FOLLOW Set ---------------
+            var FIRST = new List<HashSet<int>>();
+            foreach (var rule in production_rules)
+                FIRST.Add(first_terminals(rule.index));
+
+            var FOLLOW = new List<HashSet<int>>();
+            for (int i = 0; i < production_rules.Count; i++)
+                FOLLOW.Add(new HashSet<int>());
+            FOLLOW[0].Add(-1); // -1: Sentinel
+
+            // 1. B -> a A b, Add FIRST(b) to FOLLOW(A)
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    foreach (var rule in production_rules[i].sub_productions)
+                        for (int j = 0; j < rule.Count - 1; j++)
+                            if (rule[j].isterminal == false || rule[j + 1].isterminal)
+                                foreach (var r in FIRST[rule[j + 1].index])
+                                    FOLLOW[rule[j].index].Add(r);
+
+            // 2. B -> a A b and empty -> FIRST(b), Add FOLLOW(B) to FOLLOW(A)
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    foreach (var rule in production_rules[i].sub_productions)
+                        if (rule.Count > 2 && rule[rule.Count - 2].isterminal == false && FIRST[rule.Last().index].Contains(EmptyString.index))
+                            foreach (var r in FOLLOW[i])
+                                FOLLOW[rule[rule.Count - 2].index].Add(r);
+
+            // 3. B -> a A, Add FOLLOW(B) to FOLLOW(A)
+            for (int i = 0; i < production_rules.Count; i++)
+                if (!production_rules[i].isterminal)
+                    foreach (var rule in production_rules[i].sub_productions)
+                        if (rule.Count > 0 && rule.Last().isterminal == false)
+                            foreach (var r in FOLLOW[i])
+                                if (rule.Last().index > 0)
+                                    FOLLOW[rule.Last().index].Add(r);
+            // --------------------------------------------------------
+
+            // (state_index, (production_rule_index, sub_productions_pos, dot_position, (lookahead))
+            var states = new Dictionary<int, List<Tuple<int, int, int, HashSet<int>>>>();
+            // (state_specify, state_index)
+            var state_index = new Dictionary<string, int>();
+            var goto_table = new List<Tuple<int, List<Tuple<int, int>>>>();
+            // (state_index, (shift_what, state_index))
+            shift_info = new Dictionary<int, List<Tuple<int, int>>>();
+            // (state_index, (reduce_what, production_rule_index, sub_productions_pos))
+            reduce_info = new Dictionary<int, List<Tuple<int, int, int>>>();
+            var index_count = 0;
+
+            // -------------------- Put first eater -------------------
+            var first_l = first_with_lookahead(0, 0, 0, new HashSet<int>());
+            state_index.Add(l2s(first_l), 0);
+            states.Add(0, first_l);
+            // --------------------------------------------------------
+
+            // Create all LR states
+            // (states)
+            var q = new Queue<int>();
+            q.Enqueue(index_count++);
+            while (q.Count != 0)
+            {
+                var p = q.Dequeue();
+
+                // Collect goto
+                // (state_index, (production_rule_index, sub_productions_pos, dot_position, lookahead))
+                var gotos = new Dictionary<int, List<Tuple<int, int, int, HashSet<int>>>>();
+                foreach (var transition in states[p])
+                    if (production_rules[transition.Item1].sub_productions[transition.Item2].Count > transition.Item3)
+                    {
+                        var pi = production_rules[transition.Item1].sub_productions[transition.Item2][transition.Item3].index;
+                        if (!gotos.ContainsKey(pi))
+                            gotos.Add(pi, new List<Tuple<int, int, int, HashSet<int>>>());
+                        gotos[pi].Add(new Tuple<int, int, int, HashSet<int>>(transition.Item1, transition.Item2, transition.Item3 + 1, transition.Item4));
+                    }
+
+                // Populate empty-string closure
+                foreach (var goto_unit in gotos)
+                {
+                    var set = new HashSet<string>();
+                    // Push exists transitions
+                    foreach (var psd in goto_unit.Value)
+                        set.Add(t2s(psd));
+                    // Find all transitions
+                    var new_trans = new List<Tuple<int, int, int, HashSet<int>>>();
+                    foreach (var psd in goto_unit.Value)
+                    {
+                        if (production_rules[psd.Item1].sub_productions[psd.Item2].Count == psd.Item3) continue;
+                        if (production_rules[psd.Item1].sub_productions[psd.Item2][psd.Item3].isterminal) continue;
+                        var first_nt = first_with_lookahead(psd.Item1, psd.Item2, psd.Item3, psd.Item4);
+                        foreach (var nts in first_nt)
+                            if (!set.Contains(t2s(nts)))
+                            {
+                                new_trans.Add(nts);
+                                set.Add(t2s(nts));
+                            }
+                    }
+                    goto_unit.Value.AddRange(new_trans);
+                }
+                
+                // Build goto transitions ignore terminal, non-terminal anywhere
+                var index_list = new List<Tuple<int, int>>();
+                foreach (var pp in gotos)
+                {
+                    var hash = l2s(pp.Value);
+                    if (!state_index.ContainsKey(hash))
+                    {
+                        states.Add(index_count, pp.Value);
+                        state_index.Add(hash, index_count);
+                        q.Enqueue(index_count++);
+                    }
+                    index_list.Add(new Tuple<int, int>(pp.Key, state_index[hash]));
+                }
+
+                goto_table.Add(new Tuple<int, List<Tuple<int, int>>> (p, index_list));
+            }
+
+            number_of_states = states.Count;
+#if false
+            foreach (var s in states)
+                print_states(s.Key, s.Value);
+#endif
+            
+            // -------------------- Merge States -------------------
+            var merged_states = new Dictionary<int, List<int>>();
+            var merged_states_index = new Dictionary<string, int>();
+            var merged_index = new Dictionary<int, int>();
+            var merged_merged_index = new Dictionary<int, int>();
+            var merged_merged_inverse_index = new Dictionary<string, int>();
+            var count_of_completes_states = 0;
+
+            for (int i = 0; i < states.Count; i++)
+            {
+                var str = l2s(states[i].Select(x => new Tuple<int, int, int>(x.Item1, x.Item2, x.Item3)).ToList());
+
+                if (!merged_states_index.ContainsKey(str))
+                {
+                    merged_states_index.Add(str, i);
+                    merged_states.Add(i, new List<int>());
+                    merged_index.Add(i, i);
+                    merged_merged_inverse_index.Add(str, i);
+                    merged_merged_index.Add(i, count_of_completes_states++);
+                }
+                else
+                {
+                    merged_states[merged_states_index[str]].Add(i);
+                    merged_index.Add(i, merged_states_index[str]);
+                    merged_merged_index.Add(i, merged_merged_inverse_index[str]);
+                }
+            }
+
+#if true
+            foreach (var s in merged_states)
+                print_merged_states(s.Key, states[s.Key], s.Value.Select(x => states[x].Select(y => y.Item4.ToList()).ToList()).ToList());
+#endif
+
+            foreach (var pair in merged_states)
+            {
+                for (int i = 0; i < states[pair.Key].Count; i++)
+                {
+                    foreach (var ii in pair.Value)
+                        foreach (var lookahead in states[ii][i].Item4)
+                            states[pair.Key][i].Item4.Add(lookahead);
+                }
+            }
+
+#if false
+            foreach (var s in merged_states)
+                print_states(s.Key, states[s.Key]);
+#endif
+            // -----------------------------------------------------
+
+            // ------------- Find Shift-Reduce Conflict ------------
+            foreach (var ms in merged_states)
+            {
+                // (shift_what, state_index)
+                var small_shift_info = new List<Tuple<int, int>>();
+                // (reduce_what, production_rule_index, sub_productions_pos)
+                var small_reduce_info = new List<Tuple<int, int, int>>();
+
+                // Fill Shift Info
+                foreach (var pp in goto_table[ms.Key].Item2)
+                    small_shift_info.Add(new Tuple<int, int>(pp.Item1, merged_index[pp.Item2]));
+
+                // Fill Reduce Info
+                ms.Value.Add(ms.Key);
+                foreach (var index in ms.Value)
+                    foreach (var transition in states[index])
+                        if (production_rules[transition.Item1].sub_productions[transition.Item2].Count == transition.Item3)
+                        {
+                            foreach (var term in transition.Item4)
+                                small_reduce_info.Add(new Tuple<int, int, int>(term, transition.Item1, transition.Item2));
+                        }
+
+                // Conflict Check
+                // (shift_what, small_shift_info_index)
+                var shift_tokens = new Dictionary<int, int>();
+                for (int i = 0; i < small_shift_info.Count; i++)
+                    shift_tokens.Add(small_shift_info[i].Item1, i);
+                var completes = new HashSet<int>();
+
+                foreach (var tuple in small_reduce_info)
+                {
+                    if (shift_tokens.ContainsKey(tuple.Item1))
+                    {
+#if false
+                        Console.WriteLine($"Shift-Reduce Conflict! {(tuple.Item1 == -1 ? "$" : production_rules[tuple.Item1].production_name)}");
+                        Console.WriteLine($"States: {ms.Key} {tuple.Item2}");
+                        print_states(ms.Key, states[ms.Key]);
+                        print_states(shift_tokens[tuple.Item1], states[shift_tokens[tuple.Item1]]);
+#endif
+                        var pp = get_first_on_right_terminal(production_rules[tuple.Item2], tuple.Item3);
+                        
+                        if (!shift_reduce_conflict_solve.ContainsKey(pp.index) || !shift_reduce_conflict_solve.ContainsKey(tuple.Item1))
+                            throw new Exception($"Specify the rules to resolve Shift-Reduce Conflict! Target: {production_rules[tuple.Item1].production_name} {pp.production_name}");
+                        var p1 = shift_reduce_conflict_solve[pp.index];
+                        var p2 = shift_reduce_conflict_solve[tuple.Item1];
+
+                        if (shift_reduce_conflict_solve_with_production_rule.ContainsKey(tuple.Item2))
+                            if (shift_reduce_conflict_solve_with_production_rule[tuple.Item2].ContainsKey(tuple.Item3))
+                                p1 = shift_reduce_conflict_solve_with_production_rule[tuple.Item2][tuple.Item3];
+
+                        if (shift_reduce_conflict_solve_with_production_rule.ContainsKey(states[shift_tokens[tuple.Item1]][0].Item1))
+                            if (shift_reduce_conflict_solve_with_production_rule[states[shift_tokens[tuple.Item1]][0].Item1].ContainsKey(states[shift_tokens[tuple.Item1]][0].Item2))
+                                p2 = shift_reduce_conflict_solve_with_production_rule[states[shift_tokens[tuple.Item1]][0].Item1][states[shift_tokens[tuple.Item1]][0].Item2];
+
+                        if (p1.Item1 < p2.Item1 || (p1.Item1 == p2.Item1 && p1.Item2))
+                        {
+                            // Reduce
+                            if (!reduce_info.ContainsKey(merged_merged_index[ms.Key]))
+                                reduce_info.Add(merged_merged_index[ms.Key], new List<Tuple<int, int, int>>());
+                            reduce_info[merged_merged_index[ms.Key]].Add(new Tuple<int, int, int>(tuple.Item1, tuple.Item2, tuple.Item3));
+                        }
+                        else
+                        {
+                            // Shift
+                            if (!shift_info.ContainsKey(merged_merged_index[ms.Key]))
+                                shift_info.Add(merged_merged_index[ms.Key], new List<Tuple<int, int>>());
+                            shift_info[merged_merged_index[ms.Key]].Add(new Tuple<int, int>(tuple.Item1, small_shift_info[shift_tokens[tuple.Item1]].Item2));
+                        }
+
+                        completes.Add(tuple.Item1);
+                    }
+                    else
+                    {
+                        // Just add reduce item
+                        if (!reduce_info.ContainsKey(merged_merged_index[ms.Key]))
+                            reduce_info.Add(merged_merged_index[ms.Key], new List<Tuple<int, int, int>>());
+                        reduce_info[merged_merged_index[ms.Key]].Add(new Tuple<int, int, int>(tuple.Item1, tuple.Item2, tuple.Item3));
+                    }
+                }
+
+                foreach (var pair in shift_tokens)
+                {
+                    if (completes.Contains(pair.Key)) continue;
+                    var shift = small_shift_info[pair.Value];
+                    if (!shift_info.ContainsKey(merged_merged_index[ms.Key]))
+                        shift_info.Add(merged_merged_index[ms.Key], new List<Tuple<int, int>>());
+                    shift_info[merged_merged_index[ms.Key]].Add(new Tuple<int, int>(shift.Item1, shift.Item2));
+                }
+            }
+            // -----------------------------------------------------
+        }
+#endregion
 
         public void PrintStates()
         {
@@ -661,6 +993,18 @@ namespace ParserGenerator
             return states;
         }
 
+        private ParserProduction get_first_on_right_terminal(ParserProduction pp, int sub_production)
+        {
+            for (int i = pp.sub_productions[sub_production].Count - 1; i >= 0; i--)
+                if (pp.sub_productions[sub_production][i].isterminal)
+                    return pp.sub_productions[sub_production][i];
+            throw new Exception("Cannot solve shift-reduce conflict!");
+        }
+
+        /// <summary>
+        /// Create ShiftReduce Parser
+        /// </summary>
+        /// <returns></returns>
         public ShiftReduceParser CreateShiftReduceParserInstance()
         {
             var symbol_table = new Dictionary<string, int>();
