@@ -38,11 +38,11 @@ plus, +
 num, 9999
 ```
 
-## Parser Generator / SLR Generator
+## Parser Generator
 
-I will also create LR(1) and LALR parsers.
+This source code includes the SLR, LR(1), and LALR parser generators.
 
-### Example
+### SLR Generator
 
 ``` cs
 var gen = new ParserGenerator();
@@ -91,7 +91,7 @@ I10 => REDUCE{(multiple,term,0),(plus,term,0),(op_close,term,0),($,term,0)}
 I11 => REDUCE{(multiple,factor,0),(plus,factor,0),(op_close,factor,0),($,factor,0)}
 ```
 
-## LR(1) Generator
+### LR(1) Generator
 
 ```
 var gen = new ParserGenerator();
@@ -945,6 +945,442 @@ I113 => REDUCE{(multiple,factor,0),(divide,factor,0),(plus,factor,0),(minus,fact
 I114 => SHIFT{(op_close,I116)}
 I115 => REDUCE{(multiple,func,1),(divide,func,1),(plus,func,1),(minus,func,1),(op_close,func,1),($,func,1)}
 I116 => REDUCE{(multiple,func,0),(divide,func,0),(plus,func,0),(minus,func,0),(op_close,func,0),($,func,0)}
+```
+
+### LALR Generator
+
+```
+var gen2 = new ParserGenerator();
+
+// Non-Terminals
+var S = gen2.CreateNewProduction("S", false);
+var L = gen2.CreateNewProduction("L", false);
+var R = gen2.CreateNewProduction("R", false);
+
+// Terminals
+var equal = gen2.CreateNewProduction("=");
+var mult = gen2.CreateNewProduction("*");
+var div = gen2.CreateNewProduction("/");
+var pp = gen2.CreateNewProduction("+");
+var mi = gen2.CreateNewProduction("-");
+var num = gen2.CreateNewProduction("num");
+
+// right associativity, -
+gen2.PushConflictSolver(false, new Tuple<ParserProduction, int>(S, 4));
+// left associativity, *, /
+gen2.PushConflictSolver(true, mult, div);
+// left associativity, +, -
+gen2.PushConflictSolver(true, pp, mi);
+
+S |= S + pp + S;
+S |= S + mi + S;
+S |= S + mult + S;
+S |= S + div + S;
+S |= mi + S;
+S |= num;
+
+gen2.PushStarts(S);
+gen2.Generate();
+gen2.PrintStates();
+gen2.GenerateLALR();
+gen2.PrintStates();
+var slr = gen2.CreateShiftReduceParserInstance();
+
+// 2*4+5$
+
+Action<string, string> insert = (string x, string y) =>
+{
+    slr.Insert(x, y);
+    while (slr.Reduce())
+    {
+        Console.Instance.WriteLine(slr.Stack());
+        var l = slr.LatestReduce();
+        Console.Instance.Write(l.Produnction.PadLeft(8) + " => ");
+        Console.Instance.WriteLine(string.Join(" ", l.Childs.Select(z => z.Produnction)));
+        Console.Instance.Write(l.Produnction.PadLeft(8) + " => ");
+        Console.Instance.WriteLine(string.Join(" ", l.Childs.Select(z => z.Contents)));
+        slr.Insert(x, y);
+    }
+    Console.Instance.WriteLine(slr.Stack());
+};
+
+var sg2 = new ScannerGenerator();
+sg2.PushRule("", "[\\r\\n ]");
+sg2.PushRule("+", "\\+");
+sg2.PushRule("-", "-");
+sg2.PushRule("*", "\\*");
+sg2.PushRule("/", "\\/");
+sg2.PushRule("(", "\\(");
+sg2.PushRule(")", "\\)");
+sg2.PushRule(",", ",");
+sg2.PushRule("id", "[a-z][a-z0-9]*");
+sg2.PushRule("num", "[0-9]+");
+sg2.Generate();
+sg2.CreateScannerInstance();
+
+var scanner2 = sg2.CreateScannerInstance();
+//scanner2.AllocateTarget("2+6*(6+4*7-2)+sin(a,b,c,d)+cos()*pi");
+scanner2.AllocateTarget("2+--6*4");
+
+while (scanner2.Valid())
+{
+    var ss = scanner2.Next();
+    insert(ss.Item1, ss.Item2);
+}
+insert("$", "$");
+```
+
+```
+Shift-Reduce Conflict! +
+States: 8 1
+-----I8-----
+         S -> - S ·                         $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I0-----
+        S' -> ·S                            $
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! -
+States: 8 1
+-----I8-----
+         S -> - S ·                         $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I1-----
+        S' -> S ·                           $
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+Shift-Reduce Conflict! *
+States: 8 1
+-----I8-----
+         S -> - S ·                         $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I2-----
+         S -> - ·S                          $/+/-/*//
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! /
+States: 8 1
+-----I8-----
+         S -> - S ·                         $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I3-----
+         S -> num ·                         $/+/-/*//
+
+Shift-Reduce Conflict! +
+States: 9 1
+-----I9-----
+         S -> S + S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I0-----
+        S' -> ·S                            $
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! -
+States: 9 1
+-----I9-----
+         S -> S + S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I1-----
+        S' -> S ·                           $
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+Shift-Reduce Conflict! *
+States: 9 1
+-----I9-----
+         S -> S + S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I2-----
+         S -> - ·S                          $/+/-/*//
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! /
+States: 9 1
+-----I9-----
+         S -> S + S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I3-----
+         S -> num ·                         $/+/-/*//
+
+Shift-Reduce Conflict! +
+States: 10 1
+-----I10-----
+         S -> S - S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I0-----
+        S' -> ·S                            $
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! -
+States: 10 1
+-----I10-----
+         S -> S - S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I1-----
+        S' -> S ·                           $
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+Shift-Reduce Conflict! *
+States: 10 1
+-----I10-----
+         S -> S - S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I2-----
+         S -> - ·S                          $/+/-/*//
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! /
+States: 10 1
+-----I10-----
+         S -> S - S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I3-----
+         S -> num ·                         $/+/-/*//
+
+Shift-Reduce Conflict! +
+States: 11 1
+-----I11-----
+         S -> S * S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I0-----
+        S' -> ·S                            $
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! -
+States: 11 1
+-----I11-----
+         S -> S * S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I1-----
+        S' -> S ·                           $
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+Shift-Reduce Conflict! *
+States: 11 1
+-----I11-----
+         S -> S * S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I2-----
+         S -> - ·S                          $/+/-/*//
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! /
+States: 11 1
+-----I11-----
+         S -> S * S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I3-----
+         S -> num ·                         $/+/-/*//
+
+Shift-Reduce Conflict! +
+States: 12 1
+-----I12-----
+         S -> S / S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I0-----
+        S' -> ·S                            $
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! -
+States: 12 1
+-----I12-----
+         S -> S / S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I1-----
+        S' -> S ·                           $
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+Shift-Reduce Conflict! *
+States: 12 1
+-----I12-----
+         S -> S / S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I2-----
+         S -> - ·S                          $/+/-/*//
+         S -> ·S + S                        $/+/-/*//
+         S -> ·S - S                        $/+/-/*//
+         S -> ·S * S                        $/+/-/*//
+         S -> ·S / S                        $/+/-/*//
+         S -> ·- S                          $/+/-/*//
+         S -> ·num                          $/+/-/*//
+
+Shift-Reduce Conflict! /
+States: 12 1
+-----I12-----
+         S -> S / S ·                       $/+/-/*//
+         S -> S ·+ S                        $/+/-/*//
+         S -> S ·- S                        $/+/-/*//
+         S -> S ·* S                        $/+/-/*//
+         S -> S ·/ S                        $/+/-/*//
+
+-----I3-----
+         S -> num ·                         $/+/-/*//
+         
+--------------------------------------------------------
+0 3
+0 1
+       S => num
+       S => 2
+0 1 4
+0 1 4 2
+0 1 4 2 2
+0 1 4 2 2 3
+0 1 4 2 2 8
+       S => num
+       S => 6
+0 1 4 2 2 8 6
+0 1 4 2 2 8 6 3
+0 1 4 2 2 8 6 11
+       S => num
+       S => 4
+0 1 4 2 2 8
+       S => S * S
+       S => 6 * 4
+0 1 4 2 8
+       S => - S
+       S => - 6*4
+0 1 4 9
+       S => - S
+       S => - -6*4
+0 1
+       S => S + S
+       S => 2 + --6*4
+0 1
 ```
 
 ## Shift Reduce Parser
