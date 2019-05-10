@@ -791,7 +791,7 @@ namespace ParserGenerator
             }
             // -----------------------------------------------------
            
-            number_of_states = states.Count;
+            number_of_states = merged_states.Count;
         }
 #endregion
 
