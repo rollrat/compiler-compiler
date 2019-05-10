@@ -646,7 +646,6 @@ namespace ParserGenerator
                 goto_table.Add(new Tuple<int, List<Tuple<int, int>>> (p, index_list));
             }
 
-            number_of_states = states.Count;
 #if false
             foreach (var s in states)
                 print_states(s.Key, s.Value);
@@ -791,6 +790,8 @@ namespace ParserGenerator
                 }
             }
             // -----------------------------------------------------
+           
+            number_of_states = states.Count;
         }
 #endregion
 
