@@ -1127,7 +1127,7 @@ namespace ParserGenerator
         public bool Error() => latest_error;
         public bool Reduce() => latest_reduce;
 
-        public string Stack() => string.Join(" ", state_stack);
+        public string Stack() => string.Join(" ", new Stack<int> (state_stack));
         
         public void Insert(string token_name, string contents) => Insert(symbol_name_index[token_name], contents);
         public void Insert(int index, string contents)
