@@ -680,7 +680,7 @@ namespace ParserGenerator
                 }
             }
 
-#if true
+#if false
             foreach (var s in merged_states)
                 print_merged_states(s.Key, states[s.Key], s.Value.Select(x => states[x].Select(y => y.Item4.ToList()).ToList()).ToList());
 #endif
