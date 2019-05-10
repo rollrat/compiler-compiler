@@ -767,7 +767,7 @@ namespace ParserGenerator
                             // Shift
                             if (!shift_info.ContainsKey(merged_merged_index[ms.Key]))
                                 shift_info.Add(merged_merged_index[ms.Key], new List<Tuple<int, int>>());
-                            shift_info[merged_merged_index[ms.Key]].Add(new Tuple<int, int>(tuple.Item1, small_shift_info[shift_tokens[tuple.Item1]].Item2));
+                            shift_info[merged_merged_index[ms.Key]].Add(new Tuple<int, int>(tuple.Item1, merged_merged_index[small_shift_info[shift_tokens[tuple.Item1]].Item2]));
                         }
 
                         completes.Add(tuple.Item1);
@@ -787,7 +787,7 @@ namespace ParserGenerator
                     var shift = small_shift_info[pair.Value];
                     if (!shift_info.ContainsKey(merged_merged_index[ms.Key]))
                         shift_info.Add(merged_merged_index[ms.Key], new List<Tuple<int, int>>());
-                    shift_info[merged_merged_index[ms.Key]].Add(new Tuple<int, int>(shift.Item1, shift.Item2));
+                    shift_info[merged_merged_index[ms.Key]].Add(new Tuple<int, int>(shift.Item1, merged_merged_index[shift.Item2]));
                 }
             }
             // -----------------------------------------------------
