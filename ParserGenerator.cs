@@ -1276,6 +1276,8 @@ namespace ParserGenerator
                 {
                     var index = elem.Item1;
                     if (index == -1) index = production_rules.Count;
+                    if (jump_table[reduce.Key][index] != 0)
+                        throw new Exception($"Error! Shift-Reduce Conflict is not solved! Please use LALR or LR(1) parser!\r\nJump-Table: {reduce.Key} {index}");
                     if (elem.Item2 == 0)
                         jump_table[reduce.Key][index] = 3;
                     else
