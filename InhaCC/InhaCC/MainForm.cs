@@ -103,6 +103,8 @@ namespace InhaCC
                 var non_terminals = new Dictionary<string, ParserProduction>();
                 var terminals = new Dictionary<string, ParserProduction>();
 
+                terminals.Add("''", ParserGenerator.ParserGenerator.EmptyString);
+
                 foreach (var nt in rtbPGNT.Text.Split(','))
                     non_terminals.Add(nt.Trim(), gen.CreateNewProduction(nt.Trim(), false));
 
@@ -110,10 +112,10 @@ namespace InhaCC
                 {
                     if (t.Trim() == "") continue;
 
-                    var name = t.Split(',')[0].Trim();
-                    var pp = t.Split(',')[1].Trim();
+                    var name = t.Split(',')[0];
+                    var pp = t.Substring(name.Length + 1).Trim();
 
-                    terminals.Add(pp, gen.CreateNewProduction(name));
+                    terminals.Add(pp, gen.CreateNewProduction(name.Trim()));
                 }
 
                 var prec = new Dictionary<string, List<Tuple<ParserProduction, int>>>();
