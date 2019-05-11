@@ -1,6 +1,8 @@
 # compiler-compiler
 Compiler Compiler based on CSharp
 
+Supports RE to NFA, e-NFA, NFA to DFA, DFA Minimization, Lexical Analyzer Generator, SLR, LALR, LR(1) Parser Generator.
+
 ## InhaCC - Compiler Compiler Collection
 
 ![image](1.png)
