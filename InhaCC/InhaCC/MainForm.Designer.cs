@@ -103,7 +103,7 @@
             this.tabPage1.Location = new System.Drawing.Point(4, 24);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(869, 512);
+            this.tabPage1.Size = new System.Drawing.Size(1383, 715);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Regular Expression";
             this.tabPage1.UseVisualStyleBackColor = true;
@@ -111,7 +111,7 @@
             // bREA
             // 
             this.bREA.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.bREA.Location = new System.Drawing.Point(729, 21);
+            this.bREA.Location = new System.Drawing.Point(1261, 20);
             this.bREA.Name = "bREA";
             this.bREA.Size = new System.Drawing.Size(85, 23);
             this.bREA.TabIndex = 5;
@@ -126,7 +126,7 @@
             this.tbRE.Font = new System.Drawing.Font("Consolas", 9F);
             this.tbRE.Location = new System.Drawing.Point(76, 21);
             this.tbRE.Name = "tbRE";
-            this.tbRE.Size = new System.Drawing.Size(647, 22);
+            this.tbRE.Size = new System.Drawing.Size(1179, 22);
             this.tbRE.TabIndex = 4;
             this.tbRE.Text = "[0-9]+(\\.[0-9]+)?[Ee][\\+\\-]?[0-9]+";
             // 
@@ -151,7 +151,7 @@
             this.tabControl2.Location = new System.Drawing.Point(6, 60);
             this.tabControl2.Name = "tabControl2";
             this.tabControl2.SelectedIndex = 0;
-            this.tabControl2.Size = new System.Drawing.Size(857, 446);
+            this.tabControl2.Size = new System.Drawing.Size(1374, 649);
             this.tabControl2.TabIndex = 0;
             // 
             // tabPage7
@@ -160,7 +160,7 @@
             this.tabPage7.Location = new System.Drawing.Point(4, 24);
             this.tabPage7.Name = "tabPage7";
             this.tabPage7.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage7.Size = new System.Drawing.Size(849, 418);
+            this.tabPage7.Size = new System.Drawing.Size(1366, 621);
             this.tabPage7.TabIndex = 5;
             this.tabPage7.Text = "NFA";
             this.tabPage7.UseVisualStyleBackColor = true;
@@ -173,7 +173,7 @@
             this.rtbNFA.Font = new System.Drawing.Font("Consolas", 9F);
             this.rtbNFA.Location = new System.Drawing.Point(3, 3);
             this.rtbNFA.Name = "rtbNFA";
-            this.rtbNFA.Size = new System.Drawing.Size(843, 412);
+            this.rtbNFA.Size = new System.Drawing.Size(1360, 617);
             this.rtbNFA.TabIndex = 2;
             this.rtbNFA.Text = "";
             // 
@@ -195,7 +195,7 @@
             this.rtbENFA.Font = new System.Drawing.Font("Consolas", 9F);
             this.rtbENFA.Location = new System.Drawing.Point(3, 3);
             this.rtbENFA.Name = "rtbENFA";
-            this.rtbENFA.Size = new System.Drawing.Size(843, 412);
+            this.rtbENFA.Size = new System.Drawing.Size(843, 414);
             this.rtbENFA.TabIndex = 1;
             this.rtbENFA.Text = "";
             // 
@@ -217,7 +217,7 @@
             this.rtbDFA.Font = new System.Drawing.Font("Consolas", 9F);
             this.rtbDFA.Location = new System.Drawing.Point(3, 3);
             this.rtbDFA.Name = "rtbDFA";
-            this.rtbDFA.Size = new System.Drawing.Size(843, 412);
+            this.rtbDFA.Size = new System.Drawing.Size(843, 414);
             this.rtbDFA.TabIndex = 1;
             this.rtbDFA.Text = "";
             // 
@@ -239,7 +239,7 @@
             this.rtbDFAM.Font = new System.Drawing.Font("Consolas", 9F);
             this.rtbDFAM.Location = new System.Drawing.Point(3, 3);
             this.rtbDFAM.Name = "rtbDFAM";
-            this.rtbDFAM.Size = new System.Drawing.Size(843, 412);
+            this.rtbDFAM.Size = new System.Drawing.Size(843, 414);
             this.rtbDFAM.TabIndex = 1;
             this.rtbDFAM.Text = "";
             // 
@@ -254,7 +254,7 @@
             this.tabPage2.Controls.Add(this.label2);
             this.tabPage2.Location = new System.Drawing.Point(4, 24);
             this.tabPage2.Name = "tabPage2";
-            this.tabPage2.Size = new System.Drawing.Size(869, 512);
+            this.tabPage2.Size = new System.Drawing.Size(1383, 715);
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Lexer Generator";
             this.tabPage2.UseVisualStyleBackColor = true;
@@ -267,7 +267,7 @@
             this.rtbLS.Font = new System.Drawing.Font("Consolas", 9F);
             this.rtbLS.Location = new System.Drawing.Point(404, 35);
             this.rtbLS.Name = "rtbLS";
-            this.rtbLS.Size = new System.Drawing.Size(433, 427);
+            this.rtbLS.Size = new System.Drawing.Size(943, 618);
             this.rtbLS.TabIndex = 6;
             this.rtbLS.Text = "";
             this.rtbLS.TextChanged += new System.EventHandler(this.rtbLS_TextChanged);
@@ -284,7 +284,7 @@
             // bLT
             // 
             this.bLT.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.bLT.Location = new System.Drawing.Point(99, 468);
+            this.bLT.Location = new System.Drawing.Point(99, 659);
             this.bLT.Name = "bLT";
             this.bLT.Size = new System.Drawing.Size(231, 34);
             this.bLT.TabIndex = 4;
@@ -296,16 +296,16 @@
             // 
             this.rtbLT.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.rtbLT.Font = new System.Drawing.Font("Consolas", 9F);
-            this.rtbLT.Location = new System.Drawing.Point(31, 301);
+            this.rtbLT.Location = new System.Drawing.Point(31, 475);
             this.rtbLT.Name = "rtbLT";
-            this.rtbLT.Size = new System.Drawing.Size(367, 161);
+            this.rtbLT.Size = new System.Drawing.Size(367, 178);
             this.rtbLT.TabIndex = 3;
             this.rtbLT.Text = "2-(3+5);\n2 + (6 * 3);\n(3 + 2)*2 + 5;\n2.0E-2+0.5;\n5+10\n";
             // 
             // bLG
             // 
             this.bLG.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.bLG.Location = new System.Drawing.Point(99, 261);
+            this.bLG.Location = new System.Drawing.Point(99, 435);
             this.bLG.Name = "bLG";
             this.bLG.Size = new System.Drawing.Size(231, 34);
             this.bLG.TabIndex = 2;
@@ -320,7 +320,7 @@
             this.rtbLLD.Font = new System.Drawing.Font("Consolas", 9F);
             this.rtbLLD.Location = new System.Drawing.Point(31, 35);
             this.rtbLLD.Name = "rtbLLD";
-            this.rtbLLD.Size = new System.Drawing.Size(367, 220);
+            this.rtbLLD.Size = new System.Drawing.Size(367, 394);
             this.rtbLLD.TabIndex = 1;
             this.rtbLLD.Text = "[\\r\\n ] => \"\"\n; => end\n\\+ => plus\n- => minus\n\\* => multiple\n\\/ => divide\n\\( => op" +
     "_open\n\\) => op_close\n[_$a-zA-Z][_$a-zA-Z0-9]* => id\n[0-9]+(\\.[0-9]+)?[Ee][\\+\\-]?" +
