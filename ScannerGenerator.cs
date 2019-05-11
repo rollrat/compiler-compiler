@@ -21,6 +21,7 @@ namespace ParserGenerator
     {
         public SimpleRegex(diagram dia) { Diagram = dia; }
         public SimpleRegex(string pattern) { Diagram = build(pattern); }
+        public SimpleRegex() { }
         public List<string> build_errors = new List<string>();
         public diagram Diagram;
         public const char e_closure = (char)0;
@@ -49,7 +50,7 @@ namespace ParserGenerator
             /// Starts node
             /// </summary>
             public transition_node start_node;
-            
+
             /// <summary>
             /// All nodes
             /// </summary>
@@ -58,12 +59,13 @@ namespace ParserGenerator
             public int count_of_vertex;
         }
 
+        public void MakeNFA(string pattern) { Diagram = make_nfa("(" + pattern + ")"); }
         public void OptimizeNFA() { while (opt_nfa(Diagram)) ; }
         public void NFAtoDFA() { Diagram = nfa2dfa(Diagram); }
         public void MinimizeDFA() { opt_dfa(Diagram); }
-        public void PrintDiagram() { Console.WriteLine(print_diagram(Diagram)); }
+        public string PrintDiagram() { return print_diagram(Diagram); }
 
-        public static void PrintDiagram(diagram dia) { Console.WriteLine(print_diagram(dia)); }
+        public static string PrintDiagram(diagram dia) { return print_diagram(dia); }
 
         /// <summary>
         /// Try simple-regular-expression to optimized DFA
@@ -94,15 +96,15 @@ namespace ParserGenerator
                 llist.Add(new transition_node { transition = new List<Tuple<char, transition_node>>() });
             for (int i = starts; i <= ends; i++)
             {
-                llist[i-starts].index = list.Count + i - starts;
+                llist[i - starts].index = list.Count + i - starts;
                 foreach (var ts in list[i].transition)
                     llist[i - starts].transition.Add(new Tuple<char, transition_node>(ts.Item1, llist[ts.Item2.index - starts]));
             }
             for (int i = 0; i < jump_count; i++)
                 list.Add(llist[i]);
-            return new Tuple<transition_node, transition_node, int>(llist[0], llist.Last(), ends-starts+1);
+            return new Tuple<transition_node, transition_node, int>(llist[0], llist.Last(), ends - starts + 1);
         }
-        
+
         /// <summary>
         /// Try simple-regular-expression to NFA.
         /// </summary>
@@ -324,13 +326,13 @@ namespace ParserGenerator
 
                 builder.Append($"{tn.index.ToString().PadLeft(4)}: ");
                 foreach (var j in tn.transition)
-                    builder.Append($"({j.Item1},{j.Item2.index}) ");
+                    builder.Append($"({(j.Item1 == 0 ? "null" : j.Item1.ToString())},{j.Item2.index}) ");
                 if (tn.transition.Count == 0 || tn.is_acceptable == true)
                 {
                     if (tn.accept_token_names == null)
                         builder.Append($"(ACCEPT,{tn.accept_token_name})");
                     else
-                        builder.Append($"(ACCEPT,{string.Join(",",tn.accept_token_names)})");
+                        builder.Append($"(ACCEPT,{string.Join(",", tn.accept_token_names)})");
                 }
                 builder.Append('\n');
 
@@ -410,7 +412,7 @@ namespace ParserGenerator
                                 }
                             }
                 }
-                
+
                 // Delete recursive e-closure
                 for (int i = 0; i < tn.transition.Count; i++)
                     if (tn.transition[i].Item1 == 0 && tn.transition[i].Item2.index == tn.index)
@@ -450,7 +452,7 @@ namespace ParserGenerator
                 {
                     var index_left = inverse_transition[tn.index].First();
                     var index_right = tn.index;
-                    
+
                     for (int i = 0; i < dia.nodes[index_left].transition.Count; i++)
                         if (dia.nodes[index_left].transition[i].Item2.index == dia.nodes[index_right].index && dia.nodes[index_left].transition[i].Item1 == 0)
                         {
@@ -505,7 +507,7 @@ namespace ParserGenerator
 
                 // (tn_attribute, diagram_indexes)
                 var dic = new Dictionary<char, HashSet<int>>();
-                var d_q = new Queue<Tuple<char,int>>(); // diagram indexes
+                var d_q = new Queue<Tuple<char, int>>(); // diagram indexes
 
 
                 hs.ToList().ForEach(dd => dia.nodes[dd].transition.ForEach(
@@ -598,7 +600,7 @@ namespace ParserGenerator
             return diagram;
         }
 
-        private string dic2str(SortedDictionary<char,int> dic)
+        private string dic2str(SortedDictionary<char, int> dic)
         {
             return string.Join(",", dic.ToList().Select(x => $"({x.Key},{x.Value})"));
         }
@@ -662,7 +664,7 @@ namespace ParserGenerator
                         group.Add(ds, new List<int>());
                     group[ds].Add(list[i].Key);
                 }
-                
+
                 foreach (var gi in group)
                 {
                     foreach (var index in gi.Value)
@@ -702,11 +704,11 @@ namespace ParserGenerator
         bool freeze = false;
         List<Tuple<string, SimpleRegex.diagram>> tokens = new List<Tuple<string, SimpleRegex.diagram>>();
         SimpleRegex.diagram diagram;
-
-        public void PrintDiagram()
+        
+        public string PrintDiagram()
         {
             if (!freeze) throw new Exception("Retry after generate!");
-            SimpleRegex.PrintDiagram(diagram);
+            return SimpleRegex.PrintDiagram(diagram);
         }
 
         public void PushRule(string token_name, string rule)
@@ -718,7 +720,7 @@ namespace ParserGenerator
                     node.accept_token_name = token_name;
             tokens.Add(new Tuple<string, SimpleRegex.diagram>(token_name, sd.Diagram));
         }
-        
+
         /// <summary>
         /// Generate merged DFA using stack.
         /// </summary>
@@ -752,7 +754,7 @@ namespace ParserGenerator
             while (q.Count != 0)
             {
                 var list = q.Dequeue();
-                var list2str = string.Join(",",list);
+                var list2str = string.Join(",", list);
 
                 var tn = states[list2str];
 
@@ -767,7 +769,7 @@ namespace ParserGenerator
                     }
 
                 var available = available_matches(merged_diagram, list);
-                
+
                 foreach (var pair in available)
                 {
                     var populate = pair.Value.ToList();
@@ -790,7 +792,7 @@ namespace ParserGenerator
             diagram.nodes = nodes;
             diagram.start_node = nodes[0];
             diagram.count_of_vertex = nodes.Count;
-            
+
             this.diagram = diagram;
         }
 
@@ -834,14 +836,14 @@ namespace ParserGenerator
                         result.Add(transition.Item2.index);
             return result;
         }
-        
+
         /// <summary>
         /// Get available next matches.
         /// </summary>
         /// <param name="dia"></param>
         /// <param name="diagram_indexes"></param>
         /// <returns></returns>
-        private Dictionary<char,List<int>> available_matches(SimpleRegex.diagram dia, List<int> diagram_indexes)
+        private Dictionary<char, List<int>> available_matches(SimpleRegex.diagram dia, List<int> diagram_indexes)
         {
             // (match, (diagram_index, transition_index))
             var result = new Dictionary<char, List<int>>();
@@ -854,11 +856,11 @@ namespace ParserGenerator
                 }
             return result;
         }
-        
+
         public Scanner CreateScannerInstance(string delimiter = "\n\r ")
         {
             if (!freeze) throw new Exception("Retry after generate!");
-            
+
             var table = new int[diagram.count_of_vertex][];
             var accept_table = new string[diagram.count_of_vertex];
             for (int i = 0; i < table.Length; i++)
@@ -867,7 +869,7 @@ namespace ParserGenerator
                 for (int j = 0; j < 255; j++)
                     table[i][j] = -1;
             }
-            
+
             // Fill transitions
             for (int i = 0; i < diagram.nodes.Count; i++)
                 foreach (var transition in diagram.nodes[i].transition)
@@ -962,7 +964,7 @@ namespace ParserGenerator
 
             return new Tuple<string, string>(accept_table[node_pos], builder.ToString());
         }
-        
+
         public Tuple<string, string> Lookahead()
         {
             var npos = pos;
