@@ -421,6 +421,11 @@ namespace ParserGenerator
                             foreach (var r in FOLLOW[i])
                                 if (rule.Last().index > 0)
                                     FOLLOW[rule.Last().index].Add(r);
+
+#if true
+            print_hs(FIRST, "FIRST");
+            print_hs(FOLLOW, "FOLLOW");
+#endif
             // --------------------------------------------------------
 
             // (state_index, (production_rule_index, sub_productions_pos, dot_position, (lookahead))
@@ -682,6 +687,11 @@ namespace ParserGenerator
                             foreach (var r in FOLLOW[i])
                                 if (rule.Last().index > 0)
                                     FOLLOW[rule.Last().index].Add(r);
+
+#if true
+            print_hs(FIRST, "FIRST");
+            print_hs(FOLLOW, "FOLLOW");
+#endif
             // --------------------------------------------------------
 
             // (state_index, (production_rule_index, sub_productions_pos, dot_position, (lookahead))
