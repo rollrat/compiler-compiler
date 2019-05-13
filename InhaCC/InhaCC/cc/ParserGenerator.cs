@@ -151,6 +151,15 @@ namespace ParserGenerator
                         $"{prefix}({production_rules[i].production_name})={{{string.Join(",", lhs[i].ToList().Select(x => x == -1 ? "$" : production_rules[x].production_name))}}}\r\n");
         }
 
+        private void print_header(string head_text)
+        {
+            GlobalPrinter.Append("\r\n" + new string('=', 50) + "\r\n\r\n");
+            int spaces = 50 - head_text.Length;
+            int padLeft = spaces / 2 + head_text.Length;
+            GlobalPrinter.Append(head_text.PadLeft(padLeft).PadRight(50));
+            GlobalPrinter.Append("\r\n\r\n" + new string('=', 50) + "\r\n");
+        }
+
         private void print_states(int state, List<Tuple<int, int, int, HashSet<int>>> items)
         {
             var builder = new StringBuilder();
@@ -275,6 +284,7 @@ namespace ParserGenerator
                                     FOLLOW[rule.Last().index].Add(r);
 
 #if true
+            print_header("FISRT, FOLLOW SETS");
             print_hs(FIRST, "FIRST");
             print_hs(FOLLOW, "FOLLOW");
 #endif
@@ -423,6 +433,7 @@ namespace ParserGenerator
                                     FOLLOW[rule.Last().index].Add(r);
 
 #if true
+            print_header("FISRT, FOLLOW SETS");
             print_hs(FIRST, "FIRST");
             print_hs(FOLLOW, "FOLLOW");
 #endif
@@ -571,6 +582,7 @@ namespace ParserGenerator
                     if (shift_tokens.ContainsKey(tuple.Item1))
                     {
 #if true
+                        print_header("SHIFT-REDUCE CONFLICTS");
                         GlobalPrinter.Append($"Shift-Reduce Conflict! {(tuple.Item1 == -1 ? "$" : production_rules[tuple.Item1].production_name)}\r\n");
                         GlobalPrinter.Append($"States: {ms.Key} {tuple.Item2}\r\n");
                         print_states(ms.Key, states[ms.Key]);
@@ -632,6 +644,7 @@ namespace ParserGenerator
 
             number_of_states = states.Count;
 #if true
+            print_header("STATES INFO");
             foreach (var s in states)
                 print_states(s.Key, s.Value);
 #endif
@@ -689,6 +702,7 @@ namespace ParserGenerator
                                     FOLLOW[rule.Last().index].Add(r);
 
 #if true
+            print_header("FISRT, FOLLOW SETS");
             print_hs(FIRST, "FIRST");
             print_hs(FOLLOW, "FOLLOW");
 #endif
@@ -773,6 +787,7 @@ namespace ParserGenerator
             }
 
 #if true
+            print_header("UNMERGED STATES");
             foreach (var s in states)
                 print_states(s.Key, s.Value);
 #endif
@@ -806,6 +821,7 @@ namespace ParserGenerator
             }
 
 #if true
+            print_header("MERGED STATES WITH SOME SETS");
             foreach (var s in merged_states)
                 print_merged_states(s.Key, states[s.Key], s.Value.Select(x => states[x].Select(y => y.Item4.ToList()).ToList()).ToList());
 #endif
@@ -821,6 +837,7 @@ namespace ParserGenerator
             }
 
 #if true
+            print_header("MERGED STATES");
             foreach (var s in merged_states)
                 print_states(s.Key, states[s.Key]);
 #endif
@@ -866,6 +883,7 @@ namespace ParserGenerator
                     if (shift_tokens.ContainsKey(tuple.Item1))
                     {
 #if true
+                        print_header("SHIFT-REDUCE CONFLICTS");
                         GlobalPrinter.Append($"Shift-Reduce Conflict! {(tuple.Item1 == -1 ? "$" : production_rules[tuple.Item1].production_name)}\r\n");
                         GlobalPrinter.Append($"States: {ms.Key} {tuple.Item2}\r\n");
                         print_states(ms.Key, states[ms.Key]);
@@ -931,6 +949,7 @@ namespace ParserGenerator
 
         public void PrintStates()
         {
+            print_header("FINAL STATES");
             for (int i = 0; i < number_of_states; i++)
             {
                 var builder = new StringBuilder();
@@ -1042,8 +1061,8 @@ namespace ParserGenerator
                 builder.Append("\r\n");
             }
             builder.Append(split_line);
-
-
+            
+            print_header("PARSING TABLE");
             GlobalPrinter.Append(builder.ToString() + "\r\n");
         }
 
@@ -1307,7 +1326,8 @@ namespace ParserGenerator
         {
             public string Produnction;
             public string Contents;
-            public string UserContents;
+            public object UserContents;
+            public int ProductionRuleIndex;
             public ParsingTreeNode Parent;
             public List<ParsingTreeNode> Childs;
 
@@ -1318,15 +1338,13 @@ namespace ParserGenerator
             public static ParsingTreeNode NewNode(string production, string contents)
                 => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>(), Produnction = production, Contents = contents };
         }
-
-        int tree_index;
+        
         ParsingTreeNode root;
 
-        public ParsingTree(int index = 0)
+        public ParsingTree(ParsingTreeNode root)
         {
-            tree_index = index;
+            this.root = root;
         }
-
     }
 
     /// <summary>
@@ -1370,6 +1388,8 @@ namespace ParserGenerator
             state_stack.Clear();
             treenode_stack.Clear();
         }
+
+        public ParsingTree Tree => new ParsingTree(treenode_stack.Peek());
 
         public string Stack() => string.Join(" ", new Stack<int>(state_stack));
 
@@ -1426,6 +1446,7 @@ namespace ParserGenerator
             state_stack.Push(goto_table[state_stack.Peek()][group_table[reduce_production]]);
 
             var reduction_parent = ParsingTree.ParsingTreeNode.NewNode(symbol_index_name[group_table[reduce_production]]);
+            reduction_parent.ProductionRuleIndex = reduce_production - 1;
             reduce_treenodes.ForEach(x => x.Parent = reduction_parent);
             reduction_parent.Contents = string.Join("", reduce_treenodes.Select(x => x.Contents));
             reduction_parent.Childs = reduce_treenodes;
