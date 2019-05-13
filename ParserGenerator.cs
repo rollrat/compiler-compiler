@@ -1307,7 +1307,8 @@ namespace ParserGenerator
         {
             public string Produnction;
             public string Contents;
-            public string UserContents;
+            public object UserContents;
+            public int ProductionRuleIndex;
             public ParsingTreeNode Parent;
             public List<ParsingTreeNode> Childs;
 
@@ -1318,15 +1319,13 @@ namespace ParserGenerator
             public static ParsingTreeNode NewNode(string production, string contents)
                 => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>(), Produnction = production, Contents = contents };
         }
-
-        int tree_index;
+        
         ParsingTreeNode root;
 
-        public ParsingTree(int index = 0)
+        public ParsingTree(ParsingTreeNode root)
         {
-            tree_index = index;
+            this.root = root;
         }
-
     }
 
     /// <summary>
@@ -1370,6 +1369,8 @@ namespace ParserGenerator
             state_stack.Clear();
             treenode_stack.Clear();
         }
+
+        public ParsingTree Tree => new ParsingTree(treenode_stack.Peek());
 
         public string Stack() => string.Join(" ", new Stack<int>(state_stack));
 
@@ -1426,6 +1427,7 @@ namespace ParserGenerator
             state_stack.Push(goto_table[state_stack.Peek()][group_table[reduce_production]]);
 
             var reduction_parent = ParsingTree.ParsingTreeNode.NewNode(symbol_index_name[group_table[reduce_production]]);
+            reduction_parent.ProductionRuleIndex = reduce_production - 1;
             reduce_treenodes.ForEach(x => x.Parent = reduction_parent);
             reduction_parent.Contents = string.Join("", reduce_treenodes.Select(x => x.Contents));
             reduction_parent.Childs = reduce_treenodes;

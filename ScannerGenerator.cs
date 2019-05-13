@@ -149,7 +149,7 @@ namespace ParserGenerator
                         break;
 
                     case ')':
-                        if (opstack.Peek() != '(')
+                        if (opstack.Count == 0 || opstack.Peek() != '(')
                         {
                             build_errors.Add($"[regex] {i} no opener!");
                             return null;
@@ -896,6 +896,8 @@ namespace ParserGenerator
         bool err = false;
         int latest_pos;
         List<int> err_pos;
+        int current_line;
+        int current_column;
 
         public Scanner(int[][] transition_table, string[] accept_table)
         {
@@ -907,6 +909,8 @@ namespace ParserGenerator
         {
             target = literal;
             pos = 0;
+            current_line = 0;
+            current_column = 0;
             err_pos = new List<int>();
             err = false;
         }
@@ -923,11 +927,14 @@ namespace ParserGenerator
 
         public int Position { get { return latest_pos; } }
 
-        public Tuple<string, string> Next()
+        public Tuple<string, string, int, int> Next()
         {
             var builder = new StringBuilder();
             var node_pos = 0;
             latest_pos = pos;
+
+            int cur_line = current_line;
+            int cur_column = current_column;
 
             for (; pos < target.Length; pos++)
             {
@@ -944,6 +951,9 @@ namespace ParserGenerator
                             latest_pos = pos;
                             pos--;
                             node_pos = 0;
+                            current_column--;
+                            cur_line = current_line;
+                            cur_column = current_column;
                             continue;
                         }
                         if (accept_table[node_pos] == null)
@@ -952,9 +962,10 @@ namespace ParserGenerator
                             err_pos.Add(pos);
                             continue;
                         }
-                        return new Tuple<string, string>(accept_table[node_pos], builder.ToString());
+                        return new Tuple<string, string, int, int> (accept_table[node_pos], builder.ToString(), cur_line + 1, cur_column + 1);
 
                     default:
+                        if (target[pos] == '\n') { current_line++; current_column = 1; } else current_column++;
                         builder.Append(target[pos]);
                         break;
                 }
@@ -962,10 +973,10 @@ namespace ParserGenerator
                 node_pos = next_transition;
             }
 
-            return new Tuple<string, string>(accept_table[node_pos], builder.ToString());
+            return new Tuple<string, string, int, int> (accept_table[node_pos], builder.ToString(), cur_line + 1, cur_column + 1);
         }
 
-        public Tuple<string, string> Lookahead()
+        public Tuple<string, string, int, int> Lookahead()
         {
             var npos = pos;
             var result = Next();
