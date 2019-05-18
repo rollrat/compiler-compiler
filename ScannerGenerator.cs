@@ -470,6 +470,26 @@ namespace ParserGenerator
                 tn.transition.ForEach(x => q.Enqueue(x.Item2));
             }
 
+            // Accept Backpropagation
+            var check2 = new List<bool>(dia.count_of_vertex);
+            check2.AddRange(Enumerable.Repeat(false, dia.count_of_vertex));
+            var acc_nodes = new Queue<int>();
+            dia.nodes.Where(x => x.is_acceptable).ToList().ForEach(d => acc_nodes.Enqueue(d.index));
+            // recalculate inverse transtion
+            inverse_transition = get_inverse_transtition(dia);
+
+            while (acc_nodes.Count != 0)
+            {
+                var top = acc_nodes.Dequeue();
+                if (check2[top]) continue;
+                check2[top] = true;
+                dia.nodes[top].is_acceptable = true;
+                if (inverse_transition.ContainsKey(top))
+                    foreach (var inv in inverse_transition[top])
+                        if (dia.nodes[inv].transition.Where(x => x.Item2.index == top).First().Item1 == 0)
+                            acc_nodes.Enqueue(inv);
+            }
+
             return opt;
         }
 
