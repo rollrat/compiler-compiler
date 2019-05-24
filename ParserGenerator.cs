@@ -1,4 +1,4 @@
-﻿/*
+/*
 
    Copyright (C) 2019. rollrat All Rights Reserved.
 
@@ -13,6 +13,13 @@ using System.Text;
 
 namespace ParserGenerator
 {
+    public class ParserAction
+    {
+        public Action<ParsingTree.ParsingTreeNode> SemanticAction;
+        public static ParserAction Create(Action<ParsingTree.ParsingTreeNode> action)
+            => new ParserAction { SemanticAction = action };
+    }
+
     public class ParserProduction
     {
         public int index;
@@ -20,6 +27,8 @@ namespace ParserGenerator
         public bool isterminal;
         public List<ParserProduction> contents = new List<ParserProduction>();
         public List<List<ParserProduction>> sub_productions = new List<List<ParserProduction>>();
+        public List<ParserAction> temp_actions = new List<ParserAction>();
+        public List<ParserAction> actions = new List<ParserAction>();
 
         public static ParserProduction operator +(ParserProduction p1, ParserProduction p2)
         {
@@ -27,10 +36,18 @@ namespace ParserGenerator
             return p1;
         }
 
+        public static ParserProduction operator +(ParserProduction pp, ParserAction ac)
+        {
+            pp.temp_actions.Add(ac);
+            return pp;
+        }
+
         public static ParserProduction operator |(ParserProduction p1, ParserProduction p2)
         {
             p2.contents.Insert(0, p2);
             p1.sub_productions.Add(new List<ParserProduction>(p2.contents));
+            p1.actions.AddRange(p2.temp_actions);
+            p2.temp_actions.Clear();
             p2.contents.Clear();
             return p1;
         }
@@ -1266,6 +1283,7 @@ namespace ParserGenerator
             var grammar = new List<List<int>>();
             var grammar_group = new List<int>();
             var production_mapping = new List<List<int>>();
+            var semantic_rules = new List<ParserAction>();
             var pm_count = 0;
 
             foreach (var pr in production_rules)
@@ -1280,6 +1298,7 @@ namespace ParserGenerator
                 }
                 grammar.AddRange(ll);
                 production_mapping.Add(pm);
+                semantic_rules.AddRange(pr.actions);
             }
 
             for (int i = 0; i < number_of_states; i++)
@@ -1316,7 +1335,7 @@ namespace ParserGenerator
                     }
                 }
 
-            return new ShiftReduceParser(symbol_table, jump_table, goto_table, grammar_group.ToArray(), grammar.Select(x => x.ToArray()).ToArray());
+            return new ShiftReduceParser(symbol_table, jump_table, goto_table, grammar_group.ToArray(), grammar.Select(x => x.ToArray()).ToArray(), semantic_rules);
         }
     }
 
@@ -1339,7 +1358,7 @@ namespace ParserGenerator
                 => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>(), Produnction = production, Contents = contents };
         }
         
-        ParsingTreeNode root;
+        public ParsingTreeNode root;
 
         public ParsingTree(ParsingTreeNode root)
         {
@@ -1356,6 +1375,7 @@ namespace ParserGenerator
         List<string> symbol_index_name = new List<string>();
         Stack<int> state_stack = new Stack<int>();
         Stack<ParsingTree.ParsingTreeNode> treenode_stack = new Stack<ParsingTree.ParsingTreeNode>();
+        List<ParserAction> actions;
 
         // 3       1      2       0
         // Accept? Shift? Reduce? Error?
@@ -1364,13 +1384,14 @@ namespace ParserGenerator
         int[][] production;
         int[] group_table;
 
-        public ShiftReduceParser(Dictionary<string, int> symbol_table, int[][] jump_table, int[][] goto_table, int[] group_table, int[][] production)
+        public ShiftReduceParser(Dictionary<string, int> symbol_table, int[][] jump_table, int[][] goto_table, int[] group_table, int[][] production, List<ParserAction> actions)
         {
             symbol_name_index = symbol_table;
             this.jump_table = jump_table;
             this.goto_table = goto_table;
             this.production = production;
             this.group_table = group_table;
+            this.actions = actions;
             var l = symbol_table.ToList().Select(x => new Tuple<int, string>(x.Value, x.Key)).ToList();
             l.Sort();
             l.ForEach(x => symbol_index_name.Add(x.Item2));
@@ -1451,6 +1472,7 @@ namespace ParserGenerator
             reduction_parent.Contents = string.Join("", reduce_treenodes.Select(x => x.Contents));
             reduction_parent.Childs = reduce_treenodes;
             treenode_stack.Push(reduction_parent);
+            actions[reduction_parent.ProductionRuleIndex].SemanticAction(reduction_parent);
         }
     }
 }
