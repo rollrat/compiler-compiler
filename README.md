@@ -1548,3 +1548,120 @@ insert("$", "$");
      exp => exp plus term
      exp => 2+6*(6+4*7-2)+sin(a,b,c,d) + cos()*pi
 ```
+
+## L-Attributed
+
+```
+// --------------------------------------
+//
+//           Scanner Generator
+//
+// --------------------------------------
+
+var scanner_gen = new ScannerGenerator();
+
+scanner_gen.PushRule("", @"[\r\n ]");  // Skip characters
+scanner_gen.PushRule("end", ";");
+scanner_gen.PushRule("plus", @"\+");
+scanner_gen.PushRule("minus", @"\-");
+scanner_gen.PushRule("multiple", @"\*");
+scanner_gen.PushRule("divide", @"\/");
+scanner_gen.PushRule("op_open", @"\(");
+scanner_gen.PushRule("op_close", @"\)");
+scanner_gen.PushRule("num", @"[0-9]+(\.[0-9]+)?([Ee][\+\-]?[0-9]+)?");
+
+// Scanner Instance
+scanner_gen.Generate();
+var scanner = scanner_gen.CreateScannerInstance();
+
+// --------------------------------------
+//
+//           Parser Generator
+//
+// --------------------------------------
+
+var parser_gen = new ParserGenerator.ParserGenerator();
+
+// Non-Terminals
+var S = parser_gen.CreateNewProduction("S", false);
+var E = parser_gen.CreateNewProduction("E", false);
+
+// Terminals
+var equal = parser_gen.CreateNewProduction("equal");
+var multiple = parser_gen.CreateNewProduction("multiple");
+var divide = parser_gen.CreateNewProduction("divide");
+var plus = parser_gen.CreateNewProduction("plus");
+var minus = parser_gen.CreateNewProduction("minus");
+var num = parser_gen.CreateNewProduction("num");
+var op_open = parser_gen.CreateNewProduction("op_open");
+var op_close = parser_gen.CreateNewProduction("op_close");
+var end = parser_gen.CreateNewProduction("end");
+
+// right associativity, -
+parser_gen.PushConflictSolver(false, new Tuple<ParserProduction, int>(E, 4));
+// left associativity, *, /
+parser_gen.PushConflictSolver(true, multiple, divide);
+// left associativity, +, -
+parser_gen.PushConflictSolver(true, plus, minus);
+
+S |= E + end + ParserAction.Create(x => x.UserContents = x.Childs[0].UserContents);
+E |= E + plus + E + ParserAction.Create(x => x.UserContents = (double)x.Childs[0].UserContents + (double)x.Childs[2].UserContents);
+E |= E + minus + E + ParserAction.Create(x => x.UserContents = (double)x.Childs[0].UserContents - (double)x.Childs[2].UserContents);
+E |= E + multiple + E + ParserAction.Create(x => x.UserContents = (double)x.Childs[0].UserContents * (double)x.Childs[2].UserContents);
+E |= E + divide + E + ParserAction.Create(x => x.UserContents = (double)x.Childs[0].UserContents / (double)x.Childs[2].UserContents);
+E |= minus + E + ParserAction.Create(x => x.UserContents = -(double)x.Childs[1].UserContents);
+E |= op_open + E + op_close + ParserAction.Create(x => x.UserContents = x.Childs[1].UserContents);
+E |= num + ParserAction.Create(x => x.UserContents = double.Parse(x.Contents));
+
+parser_gen.PushStarts(S);
+parser_gen.GenerateLALR();
+
+// Parser Instance
+var parser = parser_gen.CreateShiftReduceParserInstance();
+
+// --------------------------------------
+//
+//                 Test
+//
+// --------------------------------------
+
+var test_lines = File.ReadAllLines(InputFileName);
+var builder = new StringBuilder();
+
+foreach (var line in test_lines)
+{
+    parser.Clear();
+    scanner.AllocateTarget(line);
+
+    Action<string, string> insert = (string x, string y) =>
+    {
+        parser.Insert(x, y);
+        if (parser.Error()) throw new Exception();
+        while (parser.Reduce())
+        {
+            parser.Insert(x, y);
+            if (parser.Error()) throw new Exception();
+        }
+    };
+
+    try
+    {
+        while(scanner.Valid())
+        {
+            var ss = scanner.Next();
+            if (scanner.Error()) throw new Exception();
+            insert(ss.Item1, ss.Item2);
+        }
+        if (scanner.Error()) throw new Exception();
+        insert("$", "$");
+
+        Console.WriteLine((double)(parser.Tree.root.UserContents));
+        builder.Append($"{(double)(parser.Tree.root.UserContents)}\r\n");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("Error! Check test case!");
+        builder.Append("Error\r\n");
+    }
+}
+```
