@@ -1549,9 +1549,9 @@ insert("$", "$");
      exp => 2+6*(6+4*7-2)+sin(a,b,c,d) + cos()*pi
 ```
 
-## L-Attributed
+## L-Attributed 
 
-```
+``` cs
 // --------------------------------------
 //
 //           Scanner Generator
