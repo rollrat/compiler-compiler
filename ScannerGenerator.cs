@@ -62,10 +62,11 @@ namespace ParserGenerator
         public void MakeNFA(string pattern) { Diagram = make_nfa("(" + pattern + ")"); }
         public void OptimizeNFA() { while (opt_nfa(Diagram)) ; }
         public void NFAtoDFA() { Diagram = nfa2dfa(Diagram); }
-        public void MinimizeDFA() { opt_dfa(Diagram); }
+        public void MinimizeDFA() { opt_dfa_hopcroft(Diagram); }
         public string PrintDiagram() { return print_diagram(Diagram); }
 
         public static string PrintDiagram(diagram dia) { return print_diagram(dia); }
+        public static string PrintGraph(diagram dia) { return print_diagram_for_graphviz(dia); }
 
         /// <summary>
         /// Try simple-regular-expression to optimized DFA
@@ -342,6 +343,86 @@ namespace ParserGenerator
             return builder.ToString();
         }
 
+        private static string print_diagram_for_graphviz(diagram d)
+        {
+            var builder = new StringBuilder();
+            var used = new HashSet<int>();
+
+            var stack_used = new Stack<transition_node>();
+            var check_used = new List<bool>(d.count_of_vertex);
+            check_used.AddRange(Enumerable.Repeat(false, d.count_of_vertex));
+
+            stack_used.Push(d.start_node);
+            used.Add(d.start_node.index);
+
+            while (stack_used.Count != 0)
+            {
+                var tn = stack_used.Pop();
+                if (check_used[tn.index]) continue;
+                check_used[tn.index] = true;
+
+                used.Add(tn.index);
+
+                tn.transition.ForEach(x => stack_used.Push(x.Item2));
+            }
+
+            builder.Append("digraph finite_state_machine {\r\n");
+            builder.Append("    rankdir=LR;\r\n");
+            builder.Append("    size=\"20,30\"\r\n");
+
+            // print doublecircle
+            builder.Append("    node [shape = doublecircle]; ");
+            foreach (var dd in d.nodes)
+                if (dd.is_acceptable && used.Contains(dd.index))
+                    builder.Append(dd.index + "; ");
+            builder.Append("\r\n");
+
+            // print point
+            builder.Append("    node [shape = point]; ss\r\n");
+            
+            // print circle
+            builder.Append("    node [shape = circle];\r\n");
+
+            var stack = new Stack<transition_node>();
+            var check = new List<bool>(d.count_of_vertex);
+            check.AddRange(Enumerable.Repeat(false, d.count_of_vertex));
+
+            stack.Push(d.start_node);
+            builder.Append($"    ss -> {d.start_node.index}");
+
+            while (stack.Count != 0)
+            {
+                var tn = stack.Pop();
+                if (check[tn.index]) continue;
+                check[tn.index] = true;
+                
+                foreach (var j in tn.transition)
+                {
+                    string v = "";
+                    if (j.Item1 == e_closure)
+                        v = "&epsilon;";
+                    else if (j.Item1 == '"')
+                        v = "\"";
+                    else if (j.Item1 == '\n')
+                        v = "\\n";
+                    else if (j.Item1 == '\r')
+                        v = "\\r";
+                    else if (j.Item1 == '\t')
+                        v = "\\t";
+                    else
+                        v = new string(j.Item1, 1);
+
+                    builder.Append($@"    {tn.index} -> {j.Item2.index} [ label = ""{v}"" ];" + "\r\n");
+                }
+
+                tn.transition.ForEach(x => stack.Push(x.Item2));
+            }
+
+            builder.Append("}");
+
+            return builder.ToString();
+        }
+
         /// <summary>
         /// Get inverse array of diagram nodes
         /// </summary>
@@ -612,8 +693,7 @@ namespace ParserGenerator
                         break;
                     }
             }
-
-
+            
             diagram.count_of_vertex = transition_node_list.Count;
             diagram.nodes = transition_node_list;
             diagram.start_node = transition_node_list[0];
@@ -661,7 +741,7 @@ namespace ParserGenerator
                 }
 
             color_count++;
-
+            
             while (true)
             {
                 // Collect transition color
@@ -699,6 +779,93 @@ namespace ParserGenerator
                     break;
 
                 previous_group = group;
+            }
+            
+            var dicc = new Dictionary<int, int>();
+            var inverse_transition = get_inverse_transtition(dia);
+            for (int i = 0; i < color.Count; i++)
+                if (!dicc.ContainsKey(color[i]))
+                    dicc.Add(color[i], i);
+                else if (inverse_transition.ContainsKey(i))
+                {
+                    foreach (var inv in inverse_transition[i])
+                        for (int j = 0; j < dia.nodes[inv].transition.Count; j++)
+                            if (dia.nodes[inv].transition[j].Item2.index == i)
+                                dia.nodes[inv].transition[j] = new Tuple<char, transition_node>(dia.nodes[inv].transition[j].Item1, dia.nodes[dicc[color[i]]]);
+                }
+        }
+
+        /// <summary>
+        /// Minimization DFA using Hopcroft Algorithm
+        /// </summary>
+        /// <param name="dia"></param>
+        /// <returns></returns>
+        private void opt_dfa_hopcroft(diagram dia)
+        {
+            var visit = new HashSet<string>();
+            var queue = new Queue<List<int>>();
+
+            // Enqueue Nodes
+            var acc_nodes = new List<int>();
+            var nacc_nodes = new List<int>();
+            foreach (var node in dia.nodes)
+                if (node.is_acceptable)
+                    acc_nodes.Add(node.index);
+                else
+                    nacc_nodes.Add(node.index);
+
+            queue.Enqueue(acc_nodes);
+            queue.Enqueue(nacc_nodes);
+
+            var color = new List<int>();
+            var color_count = 1;
+            color.AddRange(Enumerable.Repeat(0, dia.count_of_vertex));
+
+            acc_nodes.ForEach(x => color[x] = color_count);
+            color_count = 1;
+
+            while (queue.Count > 0)
+            {
+                var front = queue.Dequeue();
+                front.Sort();
+                var str = string.Join(",", front);
+
+                if (visit.Contains(str)) continue;
+                visit.Add(str);
+
+                //foreach (var node in front)
+                //    color[node] = color_count;
+                //color_count++;
+
+                // Collect transition color
+                var dic = new Dictionary<int, SortedDictionary<char, int>>();
+                foreach (var index in front)
+                {
+                    var node = dia.nodes[index];
+                    foreach (var ts in node.transition)
+                    {
+                        if (!dic.ContainsKey(node.index))
+                            dic.Add(node.index, new SortedDictionary<char, int>());
+                        dic[node.index].Add(ts.Item1, color[ts.Item2.index]);
+                    }
+                }
+
+                var list = dic.ToList();
+                var group = new Dictionary<string, List<int>>();
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var ds = dic2str(list[i].Value);
+                    if (!group.ContainsKey(ds))
+                        group.Add(ds, new List<int>());
+                    group[ds].Add(list[i].Key);
+                }
+
+                foreach (var gi in group)
+                {
+                    queue.Enqueue(gi.Value);
+                    gi.Value.ForEach(x => color[x] = color_count);
+                    color_count++;
+                }
             }
 
             var dicc = new Dictionary<int, int>();
