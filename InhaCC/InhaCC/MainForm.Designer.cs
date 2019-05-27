@@ -35,13 +35,10 @@
             this.label1 = new System.Windows.Forms.Label();
             this.tabControl2 = new System.Windows.Forms.TabControl();
             this.tabPage7 = new System.Windows.Forms.TabPage();
-            this.rtbNFA = new System.Windows.Forms.RichTextBox();
             this.tabPage9 = new System.Windows.Forms.TabPage();
-            this.rtbENFA = new System.Windows.Forms.RichTextBox();
             this.tabPage11 = new System.Windows.Forms.TabPage();
-            this.rtbDFA = new System.Windows.Forms.RichTextBox();
             this.tabPage10 = new System.Windows.Forms.TabPage();
-            this.rtbDFAM = new System.Windows.Forms.RichTextBox();
+            this.pictureBox4 = new System.Windows.Forms.PictureBox();
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.rtbLS = new System.Windows.Forms.RichTextBox();
             this.label3 = new System.Windows.Forms.Label();
@@ -69,6 +66,13 @@
             this.label5 = new System.Windows.Forms.Label();
             this.rtbPGNT = new System.Windows.Forms.RichTextBox();
             this.label4 = new System.Windows.Forms.Label();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.panel2 = new System.Windows.Forms.Panel();
+            this.pictureBox3 = new System.Windows.Forms.PictureBox();
+            this.panel3 = new System.Windows.Forms.Panel();
+            this.pictureBox2 = new System.Windows.Forms.PictureBox();
+            this.panel4 = new System.Windows.Forms.Panel();
+            this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.tabControl2.SuspendLayout();
@@ -76,8 +80,16 @@
             this.tabPage9.SuspendLayout();
             this.tabPage11.SuspendLayout();
             this.tabPage10.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).BeginInit();
             this.tabPage2.SuspendLayout();
             this.tabPage3.SuspendLayout();
+            this.panel1.SuspendLayout();
+            this.panel2.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox3)).BeginInit();
+            this.panel3.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
+            this.panel4.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -156,7 +168,7 @@
             // 
             // tabPage7
             // 
-            this.tabPage7.Controls.Add(this.rtbNFA);
+            this.tabPage7.Controls.Add(this.panel4);
             this.tabPage7.Location = new System.Drawing.Point(4, 24);
             this.tabPage7.Name = "tabPage7";
             this.tabPage7.Padding = new System.Windows.Forms.Padding(3);
@@ -165,83 +177,44 @@
             this.tabPage7.Text = "NFA";
             this.tabPage7.UseVisualStyleBackColor = true;
             // 
-            // rtbNFA
-            // 
-            this.rtbNFA.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.rtbNFA.Font = new System.Drawing.Font("Consolas", 9F);
-            this.rtbNFA.Location = new System.Drawing.Point(3, 3);
-            this.rtbNFA.Name = "rtbNFA";
-            this.rtbNFA.Size = new System.Drawing.Size(1360, 617);
-            this.rtbNFA.TabIndex = 2;
-            this.rtbNFA.Text = "";
-            // 
             // tabPage9
             // 
-            this.tabPage9.Controls.Add(this.rtbENFA);
+            this.tabPage9.Controls.Add(this.panel3);
             this.tabPage9.Location = new System.Drawing.Point(4, 24);
             this.tabPage9.Name = "tabPage9";
-            this.tabPage9.Size = new System.Drawing.Size(849, 418);
+            this.tabPage9.Size = new System.Drawing.Size(1366, 621);
             this.tabPage9.TabIndex = 1;
             this.tabPage9.Text = "e-NFA";
             this.tabPage9.UseVisualStyleBackColor = true;
             // 
-            // rtbENFA
-            // 
-            this.rtbENFA.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.rtbENFA.Font = new System.Drawing.Font("Consolas", 9F);
-            this.rtbENFA.Location = new System.Drawing.Point(3, 3);
-            this.rtbENFA.Name = "rtbENFA";
-            this.rtbENFA.Size = new System.Drawing.Size(843, 414);
-            this.rtbENFA.TabIndex = 1;
-            this.rtbENFA.Text = "";
-            // 
             // tabPage11
             // 
-            this.tabPage11.Controls.Add(this.rtbDFA);
+            this.tabPage11.Controls.Add(this.panel2);
             this.tabPage11.Location = new System.Drawing.Point(4, 24);
             this.tabPage11.Name = "tabPage11";
-            this.tabPage11.Size = new System.Drawing.Size(849, 418);
+            this.tabPage11.Size = new System.Drawing.Size(1366, 621);
             this.tabPage11.TabIndex = 3;
             this.tabPage11.Text = "DFA";
             this.tabPage11.UseVisualStyleBackColor = true;
             // 
-            // rtbDFA
-            // 
-            this.rtbDFA.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.rtbDFA.Font = new System.Drawing.Font("Consolas", 9F);
-            this.rtbDFA.Location = new System.Drawing.Point(3, 3);
-            this.rtbDFA.Name = "rtbDFA";
-            this.rtbDFA.Size = new System.Drawing.Size(843, 414);
-            this.rtbDFA.TabIndex = 1;
-            this.rtbDFA.Text = "";
-            // 
             // tabPage10
             // 
-            this.tabPage10.Controls.Add(this.rtbDFAM);
+            this.tabPage10.Controls.Add(this.panel1);
             this.tabPage10.Location = new System.Drawing.Point(4, 24);
             this.tabPage10.Name = "tabPage10";
-            this.tabPage10.Size = new System.Drawing.Size(849, 418);
+            this.tabPage10.Size = new System.Drawing.Size(1366, 621);
             this.tabPage10.TabIndex = 4;
             this.tabPage10.Text = "DFA Minimization";
             this.tabPage10.UseVisualStyleBackColor = true;
             // 
-            // rtbDFAM
+            // pictureBox4
             // 
-            this.rtbDFAM.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.rtbDFAM.Font = new System.Drawing.Font("Consolas", 9F);
-            this.rtbDFAM.Location = new System.Drawing.Point(3, 3);
-            this.rtbDFAM.Name = "rtbDFAM";
-            this.rtbDFAM.Size = new System.Drawing.Size(843, 414);
-            this.rtbDFAM.TabIndex = 1;
-            this.rtbDFAM.Text = "";
+            this.pictureBox4.Location = new System.Drawing.Point(3, 3);
+            this.pictureBox4.Name = "pictureBox4";
+            this.pictureBox4.Size = new System.Drawing.Size(1067, 409);
+            this.pictureBox4.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.pictureBox4.TabIndex = 2;
+            this.pictureBox4.TabStop = false;
             // 
             // tabPage2
             // 
@@ -548,6 +521,73 @@
             this.label4.TabIndex = 2;
             this.label4.Text = "Non-terminals: ";
             // 
+            // panel1
+            // 
+            this.panel1.AutoScroll = true;
+            this.panel1.Controls.Add(this.pictureBox4);
+            this.panel1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panel1.Location = new System.Drawing.Point(0, 0);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(1366, 621);
+            this.panel1.TabIndex = 3;
+            // 
+            // panel2
+            // 
+            this.panel2.AutoScroll = true;
+            this.panel2.Controls.Add(this.pictureBox3);
+            this.panel2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panel2.Location = new System.Drawing.Point(0, 0);
+            this.panel2.Name = "panel2";
+            this.panel2.Size = new System.Drawing.Size(1366, 621);
+            this.panel2.TabIndex = 4;
+            // 
+            // pictureBox3
+            // 
+            this.pictureBox3.Location = new System.Drawing.Point(3, 3);
+            this.pictureBox3.Name = "pictureBox3";
+            this.pictureBox3.Size = new System.Drawing.Size(1067, 409);
+            this.pictureBox3.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.pictureBox3.TabIndex = 2;
+            this.pictureBox3.TabStop = false;
+            // 
+            // panel3
+            // 
+            this.panel3.AutoScroll = true;
+            this.panel3.Controls.Add(this.pictureBox2);
+            this.panel3.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panel3.Location = new System.Drawing.Point(0, 0);
+            this.panel3.Name = "panel3";
+            this.panel3.Size = new System.Drawing.Size(1366, 621);
+            this.panel3.TabIndex = 4;
+            // 
+            // pictureBox2
+            // 
+            this.pictureBox2.Location = new System.Drawing.Point(3, 3);
+            this.pictureBox2.Name = "pictureBox2";
+            this.pictureBox2.Size = new System.Drawing.Size(1067, 409);
+            this.pictureBox2.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.pictureBox2.TabIndex = 2;
+            this.pictureBox2.TabStop = false;
+            // 
+            // panel4
+            // 
+            this.panel4.AutoScroll = true;
+            this.panel4.Controls.Add(this.pictureBox1);
+            this.panel4.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panel4.Location = new System.Drawing.Point(3, 3);
+            this.panel4.Name = "panel4";
+            this.panel4.Size = new System.Drawing.Size(1360, 615);
+            this.panel4.TabIndex = 4;
+            // 
+            // pictureBox1
+            // 
+            this.pictureBox1.Location = new System.Drawing.Point(3, 3);
+            this.pictureBox1.Name = "pictureBox1";
+            this.pictureBox1.Size = new System.Drawing.Size(1067, 409);
+            this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.AutoSize;
+            this.pictureBox1.TabIndex = 2;
+            this.pictureBox1.TabStop = false;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -567,10 +607,22 @@
             this.tabPage9.ResumeLayout(false);
             this.tabPage11.ResumeLayout(false);
             this.tabPage10.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).EndInit();
             this.tabPage2.ResumeLayout(false);
             this.tabPage2.PerformLayout();
             this.tabPage3.ResumeLayout(false);
             this.tabPage3.PerformLayout();
+            this.panel1.ResumeLayout(false);
+            this.panel1.PerformLayout();
+            this.panel2.ResumeLayout(false);
+            this.panel2.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox3)).EndInit();
+            this.panel3.ResumeLayout(false);
+            this.panel3.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).EndInit();
+            this.panel4.ResumeLayout(false);
+            this.panel4.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             this.ResumeLayout(false);
 
         }
@@ -588,11 +640,7 @@
         private System.Windows.Forms.TextBox tbRE;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.TabPage tabPage10;
-        private System.Windows.Forms.RichTextBox rtbENFA;
-        private System.Windows.Forms.RichTextBox rtbDFA;
-        private System.Windows.Forms.RichTextBox rtbDFAM;
         private System.Windows.Forms.TabPage tabPage7;
-        private System.Windows.Forms.RichTextBox rtbNFA;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.RichTextBox rtbLLD;
         private System.Windows.Forms.Button bLG;
@@ -618,6 +666,14 @@
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.Button bPGT;
         private System.Windows.Forms.Button bPGG;
+        private System.Windows.Forms.PictureBox pictureBox4;
+        private System.Windows.Forms.Panel panel4;
+        private System.Windows.Forms.PictureBox pictureBox1;
+        private System.Windows.Forms.Panel panel3;
+        private System.Windows.Forms.PictureBox pictureBox2;
+        private System.Windows.Forms.Panel panel2;
+        private System.Windows.Forms.PictureBox pictureBox3;
+        private System.Windows.Forms.Panel panel1;
     }
 }
 

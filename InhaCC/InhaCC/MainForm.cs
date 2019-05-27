@@ -6,14 +6,20 @@
 
 */
 
+using GraphVizWrapper;
+using GraphVizWrapper.Commands;
+using GraphVizWrapper.Queries;
 using ParserGenerator;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -30,13 +36,13 @@ namespace InhaCC
         {
             var sr = new SimpleRegex();
             sr.MakeNFA(tbRE.Text);
-            rtbNFA.Text = sr.PrintDiagram();
+            pictureBox1.Image = Graph.ToImage(SimpleRegex.PrintGraph(sr.Diagram));
             sr.OptimizeNFA();
-            rtbENFA.Text = sr.PrintDiagram();
+            pictureBox2.Image = Graph.ToImage(SimpleRegex.PrintGraph(sr.Diagram));
             sr.NFAtoDFA();
-            rtbDFA.Text = sr.PrintDiagram();
+            pictureBox3.Image = Graph.ToImage(SimpleRegex.PrintGraph(sr.Diagram));
             sr.MinimizeDFA();
-            rtbDFAM.Text = sr.PrintDiagram();
+            pictureBox4.Image = Graph.ToImage(SimpleRegex.PrintGraph(sr.Diagram));
         }
 
         Scanner scanner;
@@ -77,7 +83,7 @@ namespace InhaCC
                     var ss = scanner.Next();
                     if (scanner.Error())
                         rtbLS.AppendText("Error!\r\n");
-                    rtbLS.AppendText($"{ss.Item1},".PadRight(10) + $" {ss.Item2}\r\n");
+                    rtbLS.AppendText($"{ss.Item1},".PadRight(10) + $" {ss.Item2} - line:{ss.Item3}, column:{ss.Item4}\r\n");
                 }
             }
             catch (Exception ex)
@@ -261,6 +267,8 @@ namespace InhaCC
                         insert(ss.Item1, ss.Item2);
                     }
                     insert("$", "$");
+
+                    var x = srparser.Tree;
                 }
                 catch (Exception ex)
                 {
