@@ -13,6 +13,13 @@ using System.Text;
 
 namespace ParserGenerator
 {
+    public class ParserAction
+    {
+        public Action<ParsingTree.ParsingTreeNode> SemanticAction;
+        public static ParserAction Create(Action<ParsingTree.ParsingTreeNode> action)
+            => new ParserAction { SemanticAction = action };
+    }
+
     public class ParserProduction
     {
         public int index;
@@ -20,6 +27,8 @@ namespace ParserGenerator
         public bool isterminal;
         public List<ParserProduction> contents = new List<ParserProduction>();
         public List<List<ParserProduction>> sub_productions = new List<List<ParserProduction>>();
+        public List<ParserAction> temp_actions = new List<ParserAction>();
+        public List<ParserAction> actions = new List<ParserAction>();
 
         public static ParserProduction operator +(ParserProduction p1, ParserProduction p2)
         {
@@ -27,10 +36,65 @@ namespace ParserGenerator
             return p1;
         }
 
+        public static ParserProduction operator +(ParserProduction pp, ParserAction ac)
+        {
+            pp.temp_actions.Add(ac);
+            return pp;
+        }
+
         public static ParserProduction operator |(ParserProduction p1, ParserProduction p2)
         {
             p2.contents.Insert(0, p2);
             p1.sub_productions.Add(new List<ParserProduction>(p2.contents));
+            p1.actions.AddRange(p2.temp_actions);
+            p2.temp_actions.Clear();
+            p2.contents.Clear();
+            return p1;
+        }
+       
+#if false
+        public static ParserProduction operator +(ParserProduction p1, string p2)
+        {
+            p1.contents.Add(new ParserProduction { isterminal = true, token_specific = p2 });
+            return p1;
+        }
+
+        public static ParserProduction operator|(ParserProduction p1, string p2)
+        {
+            p1.sub_productions.Add(new List<ParserProduction> { p1, new ParserProduction { isterminal = true, token_specific = p2 } });
+            return p1;
+        }
+#endif
+    }
+   
+    public class ParserProduction
+    {
+        public int index;
+        public string production_name;
+        public bool isterminal;
+        public List<ParserProduction> contents = new List<ParserProduction>();
+        public List<List<ParserProduction>> sub_productions = new List<List<ParserProduction>>();
+        public List<ParserAction> temp_actions = new List<ParserAction>();
+        public List<ParserAction> actions = new List<ParserAction>();
+
+        public static ParserProduction operator +(ParserProduction p1, ParserProduction p2)
+        {
+            p1.contents.Add(p2);
+            return p1;
+        }
+
+        public static ParserProduction operator +(ParserProduction pp, ParserAction ac)
+        {
+            pp.temp_actions.Add(ac);
+            return pp;
+        }
+
+        public static ParserProduction operator |(ParserProduction p1, ParserProduction p2)
+        {
+            p2.contents.Insert(0, p2);
+            p1.sub_productions.Add(new List<ParserProduction>(p2.contents));
+            p1.actions.AddRange(p2.temp_actions);
+            p2.temp_actions.Clear();
             p2.contents.Clear();
             return p1;
         }
@@ -86,6 +150,11 @@ namespace ParserGenerator
             production_rules[0].sub_productions.Add(new List<ParserProduction> { pp });
         }
 
+        /// <summary>
+        /// 터미널들의 Shift-Reduce Conflict solve 정보를 넣습니다.
+        /// </summary>
+        /// <param name="left"></param>
+        /// <param name="terminals"></param>
         public void PushConflictSolver(bool left, params ParserProduction[] terminals)
         {
             var priority = shift_reduce_conflict_solve.Count + shift_reduce_conflict_solve_with_production_rule.Count;
@@ -93,6 +162,11 @@ namespace ParserGenerator
                 shift_reduce_conflict_solve.Add(pp.index, new Tuple<int, bool>(priority, left));
         }
 
+        /// <summary>
+        /// 논터미널들의 Shift-Reduce Conflict solve 정보를 넣습니다.
+        /// </summary>
+        /// <param name="left"></param>
+        /// <param name="no"></param>
         public void PushConflictSolver(bool left, params Tuple<ParserProduction, int>[] no)
         {
             var priority = shift_reduce_conflict_solve.Count + shift_reduce_conflict_solve_with_production_rule.Count;
@@ -103,8 +177,11 @@ namespace ParserGenerator
                 shift_reduce_conflict_solve_with_production_rule[ppi.Item1.index].Add(ppi.Item2, new Tuple<int, bool>(priority, left));
             }
         }
-
+        
         #region String Hash Function
+        // 원래 해시가 아니라 set로 구현해야하는게 일반적임
+        // 집합끼리의 비교연산, 일치여부 교집합을 구해 좀 더 최적화가능하지만 귀찮으니 string-hash를 쓰도록한다.
+
         private string t2s(Tuple<int, int, int> t)
         {
             return $"{t.Item1},{t.Item2},{t.Item3}";
@@ -754,6 +831,7 @@ namespace ParserGenerator
                         set.Add(t2s(psd));
                     // Find all transitions
                     var new_trans = new List<Tuple<int, int, int, HashSet<int>>>();
+                    var trans_dic = new Dictionary<string, int>();
                     foreach (var psd in goto_unit.Value)
                     {
                         if (production_rules[psd.Item1].sub_productions[psd.Item2].Count == psd.Item3) continue;
@@ -762,8 +840,17 @@ namespace ParserGenerator
                         foreach (var nts in first_nt)
                             if (!set.Contains(t2s(nts)))
                             {
-                                new_trans.Add(nts);
-                                set.Add(t2s(nts));
+                                var ts = t2s(new Tuple<int, int, int>(nts.Item1, nts.Item2, nts.Item3));
+                                if (trans_dic.ContainsKey(ts))
+                                {
+                                    nts.Item4.ToList().ForEach(x => new_trans[trans_dic[ts]].Item4.Add(x));
+                                }
+                                else
+                                {
+                                    trans_dic.Add(ts, new_trans.Count);
+                                    new_trans.Add(nts);
+                                    set.Add(t2s(nts));
+                                }
                             }
                     }
                     goto_unit.Value.AddRange(new_trans);
@@ -773,14 +860,30 @@ namespace ParserGenerator
                 var index_list = new List<Tuple<int, int>>();
                 foreach (var pp in gotos)
                 {
-                    var hash = l2s(pp.Value);
-                    if (!state_index.ContainsKey(hash))
+                    try
                     {
-                        states.Add(index_count, pp.Value);
-                        state_index.Add(hash, index_count);
-                        q.Enqueue(index_count++);
+                        var hash = l2s(pp.Value);
+                        if (!state_index.ContainsKey(hash))
+                        {
+                            states.Add(index_count, pp.Value);
+                            state_index.Add(hash, index_count);
+                            q.Enqueue(index_count++);
+                        }
+                        index_list.Add(new Tuple<int, int>(pp.Key, state_index[hash]));
                     }
-                    index_list.Add(new Tuple<int, int>(pp.Key, state_index[hash]));
+                    catch
+                    {
+                        // Now this error is not hit
+                        // For debugging
+                        print_header("GOTO CONFLICT!!");
+                        GlobalPrinter.Append($"Cannot solve lookahead overlapping!\r\n");
+                        GlobalPrinter.Append($"Please uses non-associative option or adds extra token to handle with shift-reduce conflict!\r\n");
+                        print_states(p, states[p]);
+                        print_header("INCOMPLETE STATES");
+                        foreach (var s in states)
+                            print_states(s.Key, s.Value);
+                        return;
+                    }
                 }
 
                 goto_table.Add(new Tuple<int, List<Tuple<int, int>>>(p, index_list));
@@ -887,15 +990,17 @@ namespace ParserGenerator
                         GlobalPrinter.Append($"Shift-Reduce Conflict! {(tuple.Item1 == -1 ? "$" : production_rules[tuple.Item1].production_name)}\r\n");
                         GlobalPrinter.Append($"States: {ms.Key} {tuple.Item2}\r\n");
                         print_states(ms.Key, states[ms.Key]);
-                        print_states(shift_tokens[tuple.Item1], states[shift_tokens[tuple.Item1]]);
+                        print_states(small_shift_info[shift_tokens[tuple.Item1]].Item2, states[small_shift_info[shift_tokens[tuple.Item1]].Item2]);
 #endif
                         var pp = get_first_on_right_terminal(production_rules[tuple.Item2], tuple.Item3);
 
-                        if (!shift_reduce_conflict_solve.ContainsKey(pp.index) || !shift_reduce_conflict_solve.ContainsKey(tuple.Item1))
-                            throw new Exception($"Specify the rules to resolve Shift-Reduce Conflict! Target: {production_rules[tuple.Item1].production_name} {pp.production_name}");
-                        var p1 = shift_reduce_conflict_solve[pp.index];
-                        var p2 = shift_reduce_conflict_solve[tuple.Item1];
-
+                        Tuple<int, bool> p1 = null, p2 = null;
+                        
+                        if (shift_reduce_conflict_solve.ContainsKey(pp.index))
+                            p1 = shift_reduce_conflict_solve[pp.index];
+                        if (shift_reduce_conflict_solve.ContainsKey(tuple.Item1))
+                            p2 = shift_reduce_conflict_solve[tuple.Item1];
+                        
                         if (shift_reduce_conflict_solve_with_production_rule.ContainsKey(tuple.Item2))
                             if (shift_reduce_conflict_solve_with_production_rule[tuple.Item2].ContainsKey(tuple.Item3))
                                 p1 = shift_reduce_conflict_solve_with_production_rule[tuple.Item2][tuple.Item3];
@@ -903,6 +1008,9 @@ namespace ParserGenerator
                         if (shift_reduce_conflict_solve_with_production_rule.ContainsKey(states[tuple.Item1][0].Item1))
                             if (shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1].ContainsKey(states[tuple.Item1][0].Item2))
                                 p2 = shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1][states[tuple.Item1][0].Item2];
+
+                        if (p1 == null || p2 == null)
+                            throw new Exception($"Specify the rules to resolve Shift-Reduce Conflict! Target: {production_rules[tuple.Item1].production_name} {pp.production_name}");
 
                         if (p1.Item1 < p2.Item1 || (p1.Item1 == p2.Item1 && p1.Item2))
                         {
@@ -947,6 +1055,9 @@ namespace ParserGenerator
         }
         #endregion
 
+        /// <summary>
+        /// 파싱 테이블을 집합형태로 출력합니다.
+        /// </summary>
         public void PrintStates()
         {
             print_header("FINAL STATES");
@@ -967,6 +1078,9 @@ namespace ParserGenerator
             }
         }
 
+        /// <summary>
+        /// 파싱테이블을 테이블 형태로 출력합니다.
+        /// </summary>
         public void PrintTable()
         {
             var production_mapping = new List<List<int>>();
@@ -1266,6 +1380,7 @@ namespace ParserGenerator
             var grammar = new List<List<int>>();
             var grammar_group = new List<int>();
             var production_mapping = new List<List<int>>();
+            var semantic_rules = new List<ParserAction>();
             var pm_count = 0;
 
             foreach (var pr in production_rules)
@@ -1316,10 +1431,10 @@ namespace ParserGenerator
                     }
                 }
 
-            return new ShiftReduceParser(symbol_table, jump_table, goto_table, grammar_group.ToArray(), grammar.Select(x => x.ToArray()).ToArray());
+            return new ShiftReduceParser(symbol_table, jump_table, goto_table, grammar_group.ToArray(), grammar.Select(x => x.ToArray()).ToArray(), semantic_rules);
         }
     }
-
+    
     public class ParsingTree
     {
         public class ParsingTreeNode
@@ -1346,7 +1461,7 @@ namespace ParserGenerator
             this.root = root;
         }
     }
-
+    
     /// <summary>
     /// Shift-Reduce Parser for LR(1)
     /// </summary>
@@ -1356,6 +1471,7 @@ namespace ParserGenerator
         List<string> symbol_index_name = new List<string>();
         Stack<int> state_stack = new Stack<int>();
         Stack<ParsingTree.ParsingTreeNode> treenode_stack = new Stack<ParsingTree.ParsingTreeNode>();
+        List<ParserAction> actions;
 
         // 3       1      2       0
         // Accept? Shift? Reduce? Error?
@@ -1364,13 +1480,14 @@ namespace ParserGenerator
         int[][] production;
         int[] group_table;
 
-        public ShiftReduceParser(Dictionary<string, int> symbol_table, int[][] jump_table, int[][] goto_table, int[] group_table, int[][] production)
+        public ShiftReduceParser(Dictionary<string, int> symbol_table, int[][] jump_table, int[][] goto_table, int[] group_table, int[][] production, List<ParserAction> actions)
         {
             symbol_name_index = symbol_table;
             this.jump_table = jump_table;
             this.goto_table = goto_table;
             this.production = production;
             this.group_table = group_table;
+            this.actions = actions;
             var l = symbol_table.ToList().Select(x => new Tuple<int, string>(x.Value, x.Key)).ToList();
             l.Sort();
             l.ForEach(x => symbol_index_name.Add(x.Item2));
@@ -1451,6 +1568,7 @@ namespace ParserGenerator
             reduction_parent.Contents = string.Join("", reduce_treenodes.Select(x => x.Contents));
             reduction_parent.Childs = reduce_treenodes;
             treenode_stack.Push(reduction_parent);
+            actions[reduction_parent.ProductionRuleIndex].SemanticAction(reduction_parent);
         }
     }
 }
