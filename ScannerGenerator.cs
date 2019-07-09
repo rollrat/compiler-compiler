@@ -62,7 +62,7 @@ namespace ParserGenerator
         public void MakeNFA(string pattern) { Diagram = make_nfa("(" + pattern + ")"); }
         public void OptimizeNFA() { while (opt_nfa(Diagram)) ; }
         public void NFAtoDFA() { Diagram = nfa2dfa(Diagram); }
-        public void MinimizeDFA() { opt_dfa_hopcroft(Diagram); }
+        public void MinimizeDFA() { opt_dfa(Diagram); }
         public string PrintDiagram() { return print_diagram(Diagram); }
 
         public static string PrintDiagram(diagram dia) { return print_diagram(dia); }
@@ -200,11 +200,17 @@ namespace ParserGenerator
                     case '[':
                         var ch_list = new List<char>();
                         i++;
+                        bool inverse = false;
+                        if (i < pattern.Length && pattern[i] == '^')
+                        {
+                            inverse = true;
+                            i++;
+                        }
                         for (; i < pattern.Length && pattern[i] != ']'; i++)
                         {
                             if (pattern[i] == '\\' && i + 1 < pattern.Length)
                             {
-                                if (@"+-?*|()[].=<>/".Contains(pattern[i + 1]))
+                                if (@"+-?*|()[].=<>/\".Contains(pattern[i + 1]))
                                     ch_list.Add(pattern[++i]);
                                 else
                                 {
@@ -222,6 +228,7 @@ namespace ParserGenerator
 
                                         default:
                                             build_errors.Add($"{pattern[i]} escape character not found!");
+                                            ch_list.Add(pattern[i]);
                                             break;
                                     }
                                 }
@@ -236,11 +243,38 @@ namespace ParserGenerator
                                 ch_list.Add(pattern[i]);
                         }
                         var ends_point2 = new transition_node { index = index_count++, transition = new List<Tuple<char, transition_node>>() };
+                        if (inverse)
+                        {
+                            var set = new bool[128];
+                            var nch_list = new List<char>();
+                            foreach (var ch2 in ch_list)
+                                set[ch2] = true;
+                            for (int j = 0; j < 128; j++)
+                                if (!set[j])
+                                    nch_list.Add((char)j);
+                            ch_list.Clear();
+                            ch_list = nch_list;
+                        }
                         foreach (var ch2 in ch_list)
                         {
                             cur.transition.Add(new Tuple<char, transition_node>(ch2, ends_point2));
                         }
                         cur = ends_point2;
+                        nodes.Add(cur);
+                        if (first_valid_stack.Count != 0)
+                        {
+                            second_valid_stack.Push(first_valid_stack.Peek());
+                        }
+                        first_valid_stack.Push(cur);
+                        break;
+
+                    case '.':
+                        var ends_point3 = new transition_node { index = index_count++, transition = new List<Tuple<char, transition_node>>() };
+                        for( int i2 = 0; i2 < 128; i2++)
+                        {
+                            cur.transition.Add(new Tuple<char, transition_node>((char)i2, ends_point3));
+                        }
+                        cur = ends_point3;
                         nodes.Add(cur);
                         if (first_valid_stack.Count != 0)
                         {
@@ -343,6 +377,52 @@ namespace ParserGenerator
             return builder.ToString();
         }
 
+        /// <summary>
+        /// GraphViz.Net(Jamie Dixon), Microsoft.Bcl.Immutable(Microsoft) 누겟 패키지 설치 필요
+        /// 
+        /// App.config 파일 수정해야함
+        /// <?xml version="1.0" encoding="utf-8"?>
+        /// <configuration>
+        ///     <startup> 
+        ///         <supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.5"/>
+        ///     </startup>
+        ///     <appSettings>
+        ///       <add key="graphVizLocation" value="C:\Program Files (x86)\Graphviz2.38\bin"/>
+        ///     </appSettings>
+        /// </configuration>
+        /// 
+        /// public class Graph
+        /// {
+        ///     public static Bitmap ToImage(string str)
+        ///     {
+        ///         var getStartProcessQuery = new GetStartProcessQuery();
+        ///         var getProcessStartInfoQuery = new GetProcessStartInfoQuery();
+        ///         var registerLayoutPluginCommand = new RegisterLayoutPluginCommand(getProcessStartInfoQuery, getStartProcessQuery);
+        ///         
+        ///         var wrapper = new GraphGeneration(getStartProcessQuery,
+        ///                                           getProcessStartInfoQuery,
+        ///                                           registerLayoutPluginCommand);
+        /// 
+        ///         byte[] output = wrapper.GenerateGraph(str /*"digraph{a -> b; b -> c; c -> a;}"*/, Enums.GraphReturnType.Png);
+        /// 
+        ///         return ByteToImage(output);
+        ///     }
+        /// 
+        /// 
+        ///     private static Bitmap ByteToImage(byte[] blob)
+        ///     {
+        ///         MemoryStream mStream = new MemoryStream();
+        ///         byte[] pData = blob;
+        ///         mStream.Write(pData, 0, Convert.ToInt32(pData.Length));
+        ///         Bitmap bm = new Bitmap(mStream, false);
+        ///         mStream.Dispose();
+        ///         return bm;
+        ///     }
+        /// 
+        /// }
+        /// </summary>
+        /// <param name="d"></param>
+        /// <returns></returns>
         private static string print_diagram_for_graphviz(diagram d)
         {
             var builder = new StringBuilder();
@@ -704,103 +784,13 @@ namespace ParserGenerator
         {
             return string.Join(",", dic.ToList().Select(x => $"({x.Key},{x.Value})"));
         }
-
-        /// <summary>
-        /// Minimization DFA using coloring
-        /// </summary>
-        /// <param name="dia"></param>
-        /// <returns></returns>
-        private void opt_dfa(diagram dia)
-        {
-            var color = new List<int>();
-            var color_count = 1;
-            Dictionary<string, List<int>> previous_group = null;
-            var check = new List<bool>(dia.count_of_vertex);
-            check.AddRange(Enumerable.Repeat(false, dia.count_of_vertex));
-
-            color.AddRange(Enumerable.Repeat(0, dia.count_of_vertex));
-
-#if true   // For distingushiable states
-            var color_set = new Dictionary<string, int>();
-#endif
-
-            foreach (var node in dia.nodes)
-                if (node.is_acceptable)
-                {
-                    color[node.index] = color_count;
-                    check[node.index] = true;
-
-#if true   // For distingushiable states
-                    if (node.accept_token_names != null)
-                    {
-                        if (!color_set.ContainsKey(node.accept_token_names[0]))
-                            color_set.Add(node.accept_token_names[0], color_count++);
-                        color[node.index] = color_set[node.accept_token_names[0]];
-                    }
-#endif
-                }
-
-            color_count++;
-            
-            while (true)
-            {
-                // Collect transition color
-                var dic = new Dictionary<int, SortedDictionary<char, int>>();
-                foreach (var node in dia.nodes)
-                    foreach (var ts in node.transition)
-                    {
-                        if (!dic.ContainsKey(node.index))
-                            dic.Add(node.index, new SortedDictionary<char, int>());
-                        dic[node.index].Add(ts.Item1, color[ts.Item2.index]);
-                    }
-
-                // Grouping
-                var list = dic.ToList();
-                var group = new Dictionary<string, List<int>>();
-                for (int i = 0; i < list.Count; i++)
-                {
-                    var ds = dic2str(list[i].Value);
-                    if (!group.ContainsKey(ds))
-                        group.Add(ds, new List<int>());
-                    group[ds].Add(list[i].Key);
-                }
-
-                foreach (var gi in group)
-                {
-                    foreach (var index in gi.Value)
-                        if (!check[index])
-                            color[index] = color_count;
-                    if (gi.Value.Count == 1)
-                        check[gi.Value[0]] = true;
-                    color_count++;
-                }
-
-                if (previous_group != null && previous_group.Count == group.Count)
-                    break;
-
-                previous_group = group;
-            }
-            
-            var dicc = new Dictionary<int, int>();
-            var inverse_transition = get_inverse_transtition(dia);
-            for (int i = 0; i < color.Count; i++)
-                if (!dicc.ContainsKey(color[i]))
-                    dicc.Add(color[i], i);
-                else if (inverse_transition.ContainsKey(i))
-                {
-                    foreach (var inv in inverse_transition[i])
-                        for (int j = 0; j < dia.nodes[inv].transition.Count; j++)
-                            if (dia.nodes[inv].transition[j].Item2.index == i)
-                                dia.nodes[inv].transition[j] = new Tuple<char, transition_node>(dia.nodes[inv].transition[j].Item1, dia.nodes[dicc[color[i]]]);
-                }
-        }
-
+        
         /// <summary>
         /// Minimization DFA using Hopcroft Algorithm
         /// </summary>
         /// <param name="dia"></param>
         /// <returns></returns>
-        private void opt_dfa_hopcroft(diagram dia)
+        private void opt_dfa(diagram dia)
         {
             var visit = new HashSet<string>();
             var queue = new Queue<List<int>>();
@@ -809,7 +799,7 @@ namespace ParserGenerator
             var acc_nodes = new List<int>();
             var nacc_nodes = new List<int>();
             foreach (var node in dia.nodes)
-                if (node.is_acceptable)
+                if (node.is_acceptable && node.accept_token_names == null)
                     acc_nodes.Add(node.index);
                 else
                     nacc_nodes.Add(node.index);
@@ -822,7 +812,25 @@ namespace ParserGenerator
             color.AddRange(Enumerable.Repeat(0, dia.count_of_vertex));
 
             acc_nodes.ForEach(x => color[x] = color_count);
-            color_count = 1;
+            color_count = 2;
+
+#if true    // For distingushiable states
+            var dict_dist = new Dictionary<string, List<int>>();
+            foreach (var node in dia.nodes)
+                if (node.is_acceptable && node.accept_token_names != null)
+                    if (dict_dist.ContainsKey(node.accept_token_names[0]))
+                        dict_dist[node.accept_token_names[0]].Add(node.index);
+                    else
+                        dict_dist.Add(node.accept_token_names[0], new List<int> { node.index });
+
+            foreach (var dist in dict_dist)
+            {
+                foreach (var dd in dist.Value)
+                    color[dd] = color_count;
+                queue.Enqueue(dist.Value);
+                color_count++;
+            }
+#endif
 
             while (queue.Count > 0)
             {
@@ -832,11 +840,7 @@ namespace ParserGenerator
 
                 if (visit.Contains(str)) continue;
                 visit.Add(str);
-
-                //foreach (var node in front)
-                //    color[node] = color_count;
-                //color_count++;
-
+                
                 // Collect transition color
                 var dic = new Dictionary<int, SortedDictionary<char, int>>();
                 foreach (var index in front)
@@ -979,7 +983,7 @@ namespace ParserGenerator
             diagram.nodes = nodes;
             diagram.start_node = nodes[0];
             diagram.count_of_vertex = nodes.Count;
-
+            
             this.diagram = diagram;
         }
 
@@ -1113,6 +1117,8 @@ namespace ParserGenerator
         }
 
         public int Position { get { return latest_pos; } }
+        public int Line { get { return current_line; } set { current_line = value; } }
+        public int Column { get { return current_column; } set { current_column = value; } }
 
         public Tuple<string, string, int, int> Next()
         {
@@ -1159,7 +1165,8 @@ namespace ParserGenerator
 
                 node_pos = next_transition;
             }
-
+            if (accept_table[node_pos] == null)
+                throw new Exception($"[SCANNER] Pattern not found! L:{cur_line}, C:{cur_column}, D:'{builder.ToString()}'");
             return new Tuple<string, string, int, int> (accept_table[node_pos], builder.ToString(), cur_line + 1, cur_column + 1);
         }
 
