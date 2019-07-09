@@ -51,53 +51,6 @@ namespace ParserGenerator
             p2.contents.Clear();
             return p1;
         }
-       
-#if false
-        public static ParserProduction operator +(ParserProduction p1, string p2)
-        {
-            p1.contents.Add(new ParserProduction { isterminal = true, token_specific = p2 });
-            return p1;
-        }
-
-        public static ParserProduction operator|(ParserProduction p1, string p2)
-        {
-            p1.sub_productions.Add(new List<ParserProduction> { p1, new ParserProduction { isterminal = true, token_specific = p2 } });
-            return p1;
-        }
-#endif
-    }
-   
-    public class ParserProduction
-    {
-        public int index;
-        public string production_name;
-        public bool isterminal;
-        public List<ParserProduction> contents = new List<ParserProduction>();
-        public List<List<ParserProduction>> sub_productions = new List<List<ParserProduction>>();
-        public List<ParserAction> temp_actions = new List<ParserAction>();
-        public List<ParserAction> actions = new List<ParserAction>();
-
-        public static ParserProduction operator +(ParserProduction p1, ParserProduction p2)
-        {
-            p1.contents.Add(p2);
-            return p1;
-        }
-
-        public static ParserProduction operator +(ParserProduction pp, ParserAction ac)
-        {
-            pp.temp_actions.Add(ac);
-            return pp;
-        }
-
-        public static ParserProduction operator |(ParserProduction p1, ParserProduction p2)
-        {
-            p2.contents.Insert(0, p2);
-            p1.sub_productions.Add(new List<ParserProduction>(p2.contents));
-            p1.actions.AddRange(p2.temp_actions);
-            p2.temp_actions.Clear();
-            p2.contents.Clear();
-            return p1;
-        }
 
 #if false
         public static ParserProduction operator +(ParserProduction p1, string p2)
@@ -177,7 +130,101 @@ namespace ParserGenerator
                 shift_reduce_conflict_solve_with_production_rule[ppi.Item1.index].Add(ppi.Item2, new Tuple<int, bool>(priority, left));
             }
         }
-        
+
+        /// <summary>
+        /// 문자열로부터 ParserGenerator를 가져옵니다.
+        /// </summary>
+        /// <param name="nt_syms">논터미널 심볼</param>
+        /// <param name="t_syms">터미널 심볼</param>
+        /// <param name="production_rules">프로덕션 룰</param>
+        /// <param name="sr_rules">Shift Reduce 규칙</param>
+        /// <returns></returns>
+        public static ParserGenerator GetGenerator(string[] nt_syms, Tuple<string, string>[] t_syms, string[] production_rules, string[] sr_rules )
+        {
+            var gen = new ParserGenerator();
+            var non_terminals = new Dictionary<string, ParserProduction>();
+            var terminals = new Dictionary<string, ParserProduction>();
+
+            terminals.Add("''", EmptyString);
+
+            foreach (var nt in nt_syms)
+                non_terminals.Add(nt.Trim(), gen.CreateNewProduction(nt.Trim(), false));
+            
+            foreach (var t in t_syms)
+            {
+                var name = t.Item1;
+                var pp = t.Item2;
+
+                terminals.Add(pp, gen.CreateNewProduction(name.Trim()));
+            }
+
+            var prec = new Dictionary<string, List<Tuple<ParserProduction, int>>>();
+            foreach (var pp in production_rules)
+            {
+                if (pp.Trim() == "") continue;
+
+                var split = pp.Split(new[] { "->" }, StringSplitOptions.None);
+                var left = split[0].Trim();
+                var right = split[1].Split(' ');
+
+                var prlist = new List<ParserProduction>();
+                bool stay_prec = false;
+                foreach (var ntt in right)
+                {
+                    if (string.IsNullOrEmpty(ntt)) continue;
+                    if (ntt == "%prec") { stay_prec = true; continue; }
+                    if (stay_prec)
+                    {
+                        if (!prec.ContainsKey(ntt))
+                            prec.Add(ntt, new List<Tuple<ParserProduction, int>>());
+                        prec[ntt].Add(new Tuple<ParserProduction, int>(non_terminals[left], non_terminals[left].sub_productions.Count));
+                        continue;
+                    }
+                    if (non_terminals.ContainsKey(ntt))
+                        prlist.Add(non_terminals[ntt]);
+                    else if (terminals.ContainsKey(ntt))
+                        prlist.Add(terminals[ntt]);
+                    else
+                        throw new Exception($"Production rule build error!\r\n{ntt} is neither non-terminal nor terminal!\r\nDeclare the token-name!");
+                }
+                non_terminals[left].sub_productions.Add(prlist);
+            }
+            
+            for (int i = sr_rules.Length - 1; i >= 0; i--)
+            {
+                var line = sr_rules[i].Trim();
+                if (line == "") continue;
+                var tt = line.Split(' ')[0];
+                var rr = line.Substring(tt.Length).Trim().Split(',');
+
+                var left = true;
+                var items1 = new List<Tuple<ParserProduction, int>>();
+                var items2 = new List<ParserProduction>();
+
+                if (tt == "%right") left = false;
+
+                foreach (var ii in rr.Select(x => x.Trim()))
+                {
+                    if (string.IsNullOrEmpty(ii)) continue;
+                    if (terminals.ContainsKey(ii))
+                        items2.Add(terminals[ii]);
+                    else if (prec.ContainsKey(ii))
+                        items1.AddRange(prec[ii]);
+                    else
+                        throw new Exception($"Production rule build error!\r\n{ii} is neither non-terminal nor terminal!\r\nDeclare the token-name!");
+                }
+
+                if (items1.Count > 0)
+                    gen.PushConflictSolver(left, items1.ToArray());
+                else
+                    gen.PushConflictSolver(left, items2.ToArray());
+            }
+
+            gen.PushStarts(non_terminals[nt_syms[0]]);
+
+            return gen;
+        }
+
         #region String Hash Function
         // 원래 해시가 아니라 set로 구현해야하는게 일반적임
         // 집합끼리의 비교연산, 일치여부 교집합을 구해 좀 더 최적화가능하지만 귀찮으니 string-hash를 쓰도록한다.
@@ -562,6 +609,7 @@ namespace ParserGenerator
                         set.Add(t2s(psd));
                     // Find all transitions
                     var new_trans = new List<Tuple<int, int, int, HashSet<int>>>();
+                    var trans_dic = new Dictionary<string, int>();
                     foreach (var psd in goto_unit.Value)
                     {
                         if (production_rules[psd.Item1].sub_productions[psd.Item2].Count == psd.Item3) continue;
@@ -570,8 +618,17 @@ namespace ParserGenerator
                         foreach (var nts in first_nt)
                             if (!set.Contains(t2s(nts)))
                             {
-                                new_trans.Add(nts);
-                                set.Add(t2s(nts));
+                                var ts = t2s(new Tuple<int, int, int>(nts.Item1, nts.Item2, nts.Item3));
+                                if (trans_dic.ContainsKey(ts))
+                                {
+                                    nts.Item4.ToList().ForEach(x => new_trans[trans_dic[ts]].Item4.Add(x));
+                                }
+                                else
+                                {
+                                    trans_dic.Add(ts, new_trans.Count);
+                                    new_trans.Add(nts);
+                                    set.Add(t2s(nts));
+                                }
                             }
                     }
                     goto_unit.Value.AddRange(new_trans);
@@ -603,7 +660,7 @@ namespace ParserGenerator
                 //        foreach (var term in transition.Item4)
                 //            reduce_info[p].Add(new Tuple<int, int, int>(term, transition.Item1, transition.Item2));
                 //    }
-                
+
                 // Build goto transitions ignore terminal, non-terminal anywhere
                 var index_list = new List<Tuple<int, int>>();
                 foreach (var pp in gotos)
@@ -661,24 +718,29 @@ namespace ParserGenerator
 #if true
                         print_header("SHIFT-REDUCE CONFLICTS");
                         GlobalPrinter.Append($"Shift-Reduce Conflict! {(tuple.Item1 == -1 ? "$" : production_rules[tuple.Item1].production_name)}\r\n");
-                        GlobalPrinter.Append($"States: {ms.Key} {tuple.Item2}\r\n");
+                        GlobalPrinter.Append($"States: {ms.Key} {small_shift_info[shift_tokens[tuple.Item1]].Item2}\r\n");
                         print_states(ms.Key, states[ms.Key]);
-                        print_states(shift_tokens[tuple.Item1], states[shift_tokens[tuple.Item1]]);
+                        print_states(small_shift_info[shift_tokens[tuple.Item1]].Item2, states[small_shift_info[shift_tokens[tuple.Item1]].Item2]);
 #endif
                         var pp = get_first_on_right_terminal(production_rules[tuple.Item2], tuple.Item3);
 
-                        if (!shift_reduce_conflict_solve.ContainsKey(pp.index) || !shift_reduce_conflict_solve.ContainsKey(tuple.Item1))
-                            throw new Exception($"Specify the rules to resolve Shift-Reduce Conflict! Target: {production_rules[tuple.Item1].production_name} {pp.production_name}");
-                        var p1 = shift_reduce_conflict_solve[pp.index];
-                        var p2 = shift_reduce_conflict_solve[tuple.Item1];
+                        Tuple<int, bool> p1 = null, p2 = null;
+
+                        if (shift_reduce_conflict_solve.ContainsKey(pp.index))
+                            p1 = shift_reduce_conflict_solve[pp.index];
+                        if (shift_reduce_conflict_solve.ContainsKey(tuple.Item1))
+                            p2 = shift_reduce_conflict_solve[tuple.Item1];
 
                         if (shift_reduce_conflict_solve_with_production_rule.ContainsKey(tuple.Item2))
                             if (shift_reduce_conflict_solve_with_production_rule[tuple.Item2].ContainsKey(tuple.Item3))
                                 p1 = shift_reduce_conflict_solve_with_production_rule[tuple.Item2][tuple.Item3];
 
-                        if (shift_reduce_conflict_solve_with_production_rule.ContainsKey(states[tuple.Item1][0].Item1))
-                            if (shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1].ContainsKey(states[tuple.Item1][0].Item2))
-                                p2 = shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1][states[tuple.Item1][0].Item2];
+                        //if (shift_reduce_conflict_solve_with_production_rule.ContainsKey(states[tuple.Item1][0].Item1))
+                        //    if (shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1].ContainsKey(states[tuple.Item1][0].Item2))
+                        //        p2 = shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1][states[tuple.Item1][0].Item2];
+
+                        if (p1 == null || p2 == null)
+                            throw new Exception($"Specify the rules to resolve Shift-Reduce Conflict! Target: {production_rules[tuple.Item1].production_name} {pp.production_name}");
 
                         if (p1.Item1 < p2.Item1 || (p1.Item1 == p2.Item1 && p1.Item2))
                         {
@@ -988,7 +1050,7 @@ namespace ParserGenerator
 #if true
                         print_header("SHIFT-REDUCE CONFLICTS");
                         GlobalPrinter.Append($"Shift-Reduce Conflict! {(tuple.Item1 == -1 ? "$" : production_rules[tuple.Item1].production_name)}\r\n");
-                        GlobalPrinter.Append($"States: {ms.Key} {tuple.Item2}\r\n");
+                        GlobalPrinter.Append($"States: {ms.Key} {small_shift_info[shift_tokens[tuple.Item1]].Item2}\r\n");
                         print_states(ms.Key, states[ms.Key]);
                         print_states(small_shift_info[shift_tokens[tuple.Item1]].Item2, states[small_shift_info[shift_tokens[tuple.Item1]].Item2]);
 #endif
@@ -1005,9 +1067,9 @@ namespace ParserGenerator
                             if (shift_reduce_conflict_solve_with_production_rule[tuple.Item2].ContainsKey(tuple.Item3))
                                 p1 = shift_reduce_conflict_solve_with_production_rule[tuple.Item2][tuple.Item3];
 
-                        if (shift_reduce_conflict_solve_with_production_rule.ContainsKey(states[tuple.Item1][0].Item1))
-                            if (shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1].ContainsKey(states[tuple.Item1][0].Item2))
-                                p2 = shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1][states[tuple.Item1][0].Item2];
+                        //if (shift_reduce_conflict_solve_with_production_rule.ContainsKey(states[tuple.Item1][0].Item1))
+                        //    if (shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1].ContainsKey(states[tuple.Item1][0].Item2))
+                        //        p2 = shift_reduce_conflict_solve_with_production_rule[states[tuple.Item1][0].Item1][states[tuple.Item1][0].Item2];
 
                         if (p1 == null || p2 == null)
                             throw new Exception($"Specify the rules to resolve Shift-Reduce Conflict! Target: {production_rules[tuple.Item1].production_name} {pp.production_name}");
@@ -1054,6 +1116,29 @@ namespace ParserGenerator
             number_of_states = merged_states.Count;
         }
         #endregion
+
+        public void PrintProductionRules()
+        {
+            print_header("PRODUCTION RULES");
+            int count = 1;
+            var builder = new StringBuilder();
+            foreach (var pp in production_rules)
+            {
+                foreach (var p in pp.sub_productions)
+                {
+                    builder.Append($"{(count++).ToString().PadLeft(4)}: ");
+                    builder.Append($"{pp.production_name.ToString().PadLeft(10)} -> ");
+
+                    for (int i = 0; i < p.Count; i++)
+                    {
+                        builder.Append(p[i].production_name + " ");
+                    }
+
+                    builder.Append("\r\n");
+                }
+            }
+            GlobalPrinter.Append(builder.ToString());
+        }
 
         /// <summary>
         /// 파싱 테이블을 집합형태로 출력합니다.
@@ -1395,6 +1480,7 @@ namespace ParserGenerator
                 }
                 grammar.AddRange(ll);
                 production_mapping.Add(pm);
+                semantic_rules.AddRange(pr.actions);
             }
 
             for (int i = 0; i < number_of_states; i++)
@@ -1434,12 +1520,12 @@ namespace ParserGenerator
             return new ShiftReduceParser(symbol_table, jump_table, goto_table, grammar_group.ToArray(), grammar.Select(x => x.ToArray()).ToArray(), semantic_rules);
         }
     }
-    
+
     public class ParsingTree
     {
         public class ParsingTreeNode
         {
-            public string Produnction;
+            public string Production;
             public string Contents;
             public object UserContents;
             public int ProductionRuleIndex;
@@ -1449,24 +1535,56 @@ namespace ParserGenerator
             public static ParsingTreeNode NewNode()
                 => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>() };
             public static ParsingTreeNode NewNode(string production)
-                => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>(), Produnction = production };
+                => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>(), Production = production };
             public static ParsingTreeNode NewNode(string production, string contents)
-                => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>(), Produnction = production, Contents = contents };
+                => new ParsingTreeNode { Parent = null, Childs = new List<ParsingTreeNode>(), Production = production, Contents = contents };
         }
         
-        ParsingTreeNode root;
+        public ParsingTreeNode root;
 
         public ParsingTree(ParsingTreeNode root)
         {
             this.root = root;
         }
+
+        static void inner_print(StringBuilder builder, ParsingTreeNode node, string indent, bool last)
+        {
+            builder.Append(indent);
+            if (last)
+            {
+                builder.Append("+-");
+                indent += "  ";
+            }
+            else
+            {
+                builder.Append("|-");
+                indent += "| ";
+            }
+
+            if (node.Childs.Count == 0)
+            {
+                builder.Append(node.Production + " " + node.Contents + "\r\n");
+            }
+            else
+            {
+                builder.Append(node.Production + "\r\n");
+            }
+            for (int i = 0; i < node.Childs.Count; i++)
+                inner_print(builder, node.Childs[i], indent, i == node.Childs.Count - 1);
+        }
+
+        public void Print(StringBuilder builder)
+        {
+            inner_print(builder, root, "", true);
+        }
     }
-    
+
     /// <summary>
     /// Shift-Reduce Parser for LR(1)
     /// </summary>
     public class ShiftReduceParser
     {
+        [JsonProperty]
         Dictionary<string, int> symbol_name_index = new Dictionary<string, int>();
         List<string> symbol_index_name = new List<string>();
         Stack<int> state_stack = new Stack<int>();
@@ -1475,9 +1593,13 @@ namespace ParserGenerator
 
         // 3       1      2       0
         // Accept? Shift? Reduce? Error?
+        [JsonProperty]
         int[][] jump_table;
+        [JsonProperty]
         int[][] goto_table;
+        [JsonProperty]
         int[][] production;
+        [JsonProperty]
         int[] group_table;
 
         public ShiftReduceParser(Dictionary<string, int> symbol_table, int[][] jump_table, int[][] goto_table, int[] group_table, int[][] production, List<ParserAction> actions)
@@ -1492,7 +1614,7 @@ namespace ParserGenerator
             l.Sort();
             l.ForEach(x => symbol_index_name.Add(x.Item2));
         }
-
+        
         bool latest_error;
         bool latest_reduce;
         public bool Accept() => state_stack.Count == 0;
@@ -1506,6 +1628,7 @@ namespace ParserGenerator
             treenode_stack.Clear();
         }
 
+        [JsonIgnore]
         public ParsingTree Tree => new ParsingTree(treenode_stack.Peek());
 
         public string Stack() => string.Join(" ", new Stack<int>(state_stack));
@@ -1568,7 +1691,78 @@ namespace ParserGenerator
             reduction_parent.Contents = string.Join("", reduce_treenodes.Select(x => x.Contents));
             reduction_parent.Childs = reduce_treenodes;
             treenode_stack.Push(reduction_parent);
-            actions[reduction_parent.ProductionRuleIndex].SemanticAction(reduction_parent);
+            if (actions.Count != 0)
+                actions[reduction_parent.ProductionRuleIndex].SemanticAction(reduction_parent);
+        }
+
+        //public static ShiftReduceParser FromString(string json)
+        //    => JsonConvert.DeserializeObject<ShiftReduceParser>(json);
+        //public override string ToString()
+        //    => JsonConvert.SerializeObject(this, Formatting.None);
+        public string ToCSCode(string class_name)
+        {
+            var builder = new StringBuilder();
+            var indent = "";
+            Action up_indent = () => { indent += "    "; };
+            Action down_indent = () => { if (indent.Length > 0) indent = indent.Substring(4); };
+            Action<string> append = (string s) => { builder.Append($"{indent}{s}\r\n"); };
+            append("public class " + class_name);
+            append("{");
+            up_indent();
+
+            ///////////////////
+            append("Dictionary<string, int> symbol_table = new Dictionary<string, int>()");
+            append("{");
+            up_indent();
+            foreach (var st in symbol_name_index)
+                append("{" + ('"' + st.Key + '"').PadLeft(symbol_name_index.Select(x => x.Key.Length).Max() + 3) + "," + st.Value.ToString().PadLeft(4) + " },");
+            down_indent();
+            append("};");
+            append("");
+
+            ///////////////////
+            append("int[][] jump_table = new int[][] {");
+            up_indent();
+            foreach (var gt in jump_table)
+                append("new int[] {" + string.Join(",", gt.Select(x => x.ToString().PadLeft(4))) + " },");
+            down_indent();
+            append("};");
+            append("");
+
+            ///////////////////
+            append("int[][] goto_table = new int[][] {");
+            up_indent();
+            foreach (var gt in goto_table)
+                append("new int[] {" + string.Join(",", gt.Select(x => x.ToString().PadLeft(4))) + " },");
+            down_indent();
+            append("};");
+            append("");
+
+            ///////////////////
+            append("int[][] production = new int[][] {");
+            up_indent();
+            foreach (var gt in production)
+                append("new int[] {" + string.Join(",", gt.Select(x => x.ToString().PadLeft(4))) + " },");
+            down_indent();
+            append("};");
+            append("");
+
+            ///////////////////
+            append("int[] group_table = new int[] {");
+            up_indent();
+            append(string.Join(",", group_table.Select(x => x.ToString().PadLeft(4))));
+            down_indent();
+            append("};");
+            append("");
+
+            ///////////////////
+            append("public ShiftReduceParser Parser => new ShiftReduceParser(");
+            append("    symbol_table, jump_table, goto_table, group_table, production, ");
+            append("    Enumerable.Repeat(new ParserAction { SemanticAction = (ParsingTree.ParsingTreeNode node) => { } }, production.Length).ToList());");
+
+            down_indent();
+            append("}");
+            return builder.ToString();
         }
     }
 }
