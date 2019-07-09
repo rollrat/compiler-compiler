@@ -17,7 +17,7 @@ If you want to use my code, use ParserGenerator.cs and ScannerGenerator.cs in th
 
 ## Scanner Generator / Lexical Analyzer Generator
 
-A tool for analyzing regular expressions using `(`,`)`,`+`,`*`,`?`,`|`,`[`,`]` as tokens and generating Scanner tables.
+A tool for analyzing regular expressions using `(`,`)`,`+`,`*`,`?`,`|`,`[`,`]`,`^`,`.` as tokens and generating Scanner tables.
 
 ### Example
 
