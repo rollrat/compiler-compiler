@@ -1,4 +1,4 @@
-﻿/*
+/*
 
    Copyright (C) 2019. rollrat All Rights Reserved.
 
@@ -24,7 +24,9 @@ namespace ParserGenerator
         public SimpleRegex() { }
         public List<string> build_errors = new List<string>();
         public diagram Diagram;
-        public const char e_closure = (char)0;
+        public const char e_closure = (char)0xFFFF;
+
+        public const int byte_size = 256;
 
         public class transition_node
         {
@@ -225,6 +227,14 @@ namespace ParserGenerator
                                         case 'r':
                                             ch_list.Add('\t');
                                             break;
+                                        case 'x':
+                                            char ch2;
+                                            ch2 = (char)(pattern[i + 1] >= 'A' ? (pattern[i + 1] - 'A' + 10) : pattern[i + 1] - '0');
+                                            ch2 <<= 4;
+                                            ch2 |= (char)(pattern[i + 2] >= 'A' ? (pattern[i + 2] - 'A' + 10) : pattern[i + 2] - '0');
+                                            i += 2;
+                                            ch_list.Add(ch2);
+                                            break;
 
                                         default:
                                             build_errors.Add($"{pattern[i]} escape character not found!");
@@ -245,11 +255,11 @@ namespace ParserGenerator
                         var ends_point2 = new transition_node { index = index_count++, transition = new List<Tuple<char, transition_node>>() };
                         if (inverse)
                         {
-                            var set = new bool[128];
+                            var set = new bool[byte_size];
                             var nch_list = new List<char>();
                             foreach (var ch2 in ch_list)
                                 set[ch2] = true;
-                            for (int j = 0; j < 128; j++)
+                            for (int j = 0; j < byte_size; j++)
                                 if (!set[j])
                                     nch_list.Add((char)j);
                             ch_list.Clear();
@@ -270,7 +280,7 @@ namespace ParserGenerator
 
                     case '.':
                         var ends_point3 = new transition_node { index = index_count++, transition = new List<Tuple<char, transition_node>>() };
-                        for( int i2 = 0; i2 < 128; i2++)
+                        for( int i2 = 0; i2 < byte_size; i2++)
                         {
                             cur.transition.Add(new Tuple<char, transition_node>((char)i2, ends_point3));
                         }
@@ -293,7 +303,7 @@ namespace ParserGenerator
                                 ch = pattern[i];
                             else
                             {
-                                switch (ch)
+                                switch (pattern[i])
                                 {
                                     case 'n':
                                         ch = '\n';
@@ -304,9 +314,16 @@ namespace ParserGenerator
                                     case 'r':
                                         ch = '\r';
                                         break;
+                                    case 'x':
+                                        ch = (char)(pattern[i + 1] >= 'A' ? (pattern[i + 1] - 'A' + 10) : pattern[i + 1] - '0');
+                                        ch <<= 4;
+                                        ch |= (char)(pattern[i + 2] >= 'A' ? (pattern[i + 2] - 'A' + 10) : pattern[i + 2] - '0');
+                                        i += 2;
+                                        break;
 
                                     default:
                                         build_errors.Add($"{pattern[i]} escape character not found!");
+                                        ch = pattern[i];
                                         break;
                                 }
 
@@ -557,7 +574,7 @@ namespace ParserGenerator
                 check[tn.index] = true;
 
                 // Delete unnecessary e-closure with pull left
-                if (tn.transition.Count == 1 && tn.transition[0].Item1 == 0)
+                if (tn.transition.Count == 1 && tn.transition[0].Item1 == e_closure)
                 {
                     var index_left = tn.index;
                     var index_right = tn.transition[0].Item2.index;
@@ -576,14 +593,14 @@ namespace ParserGenerator
 
                 // Delete recursive e-closure
                 for (int i = 0; i < tn.transition.Count; i++)
-                    if (tn.transition[i].Item1 == 0 && tn.transition[i].Item2.index == tn.index)
+                    if (tn.transition[i].Item1 == e_closure && tn.transition[i].Item2.index == tn.index)
                         tn.transition.RemoveAt(i--);
 
                 // Merge rounding e-closure
                 for (int i = 0; i < tn.transition.Count; i++)
-                    if (tn.transition[i].Item1 == 0)
+                    if (tn.transition[i].Item1 == e_closure)
                         for (int j = 0; j < tn.transition[i].Item2.transition.Count; j++)
-                            if (tn.transition[i].Item2.transition[j].Item1 == 0 && tn.transition[i].Item2.transition[j].Item2.index == tn.index)
+                            if (tn.transition[i].Item2.transition[j].Item1 == e_closure && tn.transition[i].Item2.transition[j].Item2.index == tn.index)
                             {
                                 var index_left = tn.index;
                                 var index_right = tn.transition[i].Item2.index;
@@ -615,7 +632,7 @@ namespace ParserGenerator
                     var index_right = tn.index;
 
                     for (int i = 0; i < dia.nodes[index_left].transition.Count; i++)
-                        if (dia.nodes[index_left].transition[i].Item2.index == dia.nodes[index_right].index && dia.nodes[index_left].transition[i].Item1 == 0)
+                        if (dia.nodes[index_left].transition[i].Item2.index == dia.nodes[index_right].index && dia.nodes[index_left].transition[i].Item1 == e_closure)
                         {
                             if (dia.nodes[index_left].transition[i].Item2.is_acceptable)
                             {
@@ -647,7 +664,7 @@ namespace ParserGenerator
                 dia.nodes[top].is_acceptable = true;
                 if (inverse_transition.ContainsKey(top))
                     foreach (var inv in inverse_transition[top])
-                        if (dia.nodes[inv].transition.Where(x => x.Item2.index == top).First().Item1 == 0)
+                        if (dia.nodes[inv].transition.Where(x => x.Item2.index == top).First().Item1 == e_closure)
                             acc_nodes.Enqueue(inv);
             }
 
@@ -698,11 +715,11 @@ namespace ParserGenerator
                 var check = new List<bool>(dia.count_of_vertex);
                 check.AddRange(Enumerable.Repeat(false, dia.count_of_vertex));
                 var e_q = new Queue<int>();
-                d_q.ToList().Where(qe => qe.Item1 == 0).ToList().ForEach(qee => { e_q.Enqueue(qee.Item2); });
+                d_q.ToList().Where(qe => qe.Item1 == e_closure).ToList().ForEach(qee => { e_q.Enqueue(qee.Item2); });
 
                 foreach (var qe in d_q)
                 {
-                    if (qe.Item1 == 0)
+                    if (qe.Item1 == e_closure)
                         e_q.Enqueue(qe.Item2);
                     else
                         check[qe.Item2] = true;
@@ -714,7 +731,7 @@ namespace ParserGenerator
                     if (check[d]) continue;
                     check[d] = true;
                     foreach (var tns in dia.nodes[d].transition)
-                        if (tns.Item1 == 0)
+                        if (tns.Item1 == e_closure)
                             e_q.Enqueue(tns.Item2.index);
                         else
                             d_q.Enqueue(new Tuple<char, int>(tns.Item1, tns.Item2.index));
@@ -725,13 +742,13 @@ namespace ParserGenerator
                 while (d_q.Count != 0)
                 {
                     var dd = d_q.Dequeue();
-                    if (dd.Item1 == 0) continue;
+                    if (dd.Item1 == e_closure) continue;
                     if (dic.ContainsKey(dd.Item1))
                         dic[dd.Item1].Add(dd.Item2);
                     else
                         dic.Add(dd.Item1, new HashSet<int> { dd.Item2 });
                     foreach (var node in dia.nodes[dd.Item2].transition)
-                        if (node.Item1 == 0)
+                        if (node.Item1 == e_closure)
                             dic[dd.Item1].Add(node.Item2.index);
                 }
 
@@ -1056,8 +1073,8 @@ namespace ParserGenerator
             var accept_table = new string[diagram.count_of_vertex];
             for (int i = 0; i < table.Length; i++)
             {
-                table[i] = new int[255];
-                for (int j = 0; j < 255; j++)
+                table[i] = new int[SimpleRegex.byte_size];
+                for (int j = 0; j < SimpleRegex.byte_size; j++)
                     table[i][j] = -1;
             }
 
@@ -1080,7 +1097,9 @@ namespace ParserGenerator
     /// </summary>
     public class Scanner
     {
+        [JsonProperty]
         int[][] transition_table;
+        [JsonProperty]
         string[] accept_table;
         string target;
         int pos = 0;
@@ -1155,7 +1174,7 @@ namespace ParserGenerator
                             err_pos.Add(pos);
                             continue;
                         }
-                        return new Tuple<string, string, int, int> (accept_table[node_pos], builder.ToString(), cur_line + 1, cur_column + 1);
+                        return new Tuple<string, string, int, int>(accept_table[node_pos], builder.ToString(), cur_line + 1, cur_column + 1);
 
                     default:
                         if (target[pos] == '\n') { current_line++; current_column = 1; } else current_column++;
@@ -1167,7 +1186,7 @@ namespace ParserGenerator
             }
             if (accept_table[node_pos] == null)
                 throw new Exception($"[SCANNER] Pattern not found! L:{cur_line}, C:{cur_column}, D:'{builder.ToString()}'");
-            return new Tuple<string, string, int, int> (accept_table[node_pos], builder.ToString(), cur_line + 1, cur_column + 1);
+            return new Tuple<string, string, int, int>(accept_table[node_pos], builder.ToString(), cur_line + 1, cur_column + 1);
         }
 
         public Tuple<string, string, int, int> Lookahead()
@@ -1176,6 +1195,43 @@ namespace ParserGenerator
             var result = Next();
             pos = npos;
             return result;
+        }
+
+        public static Scanner FromString(string json)
+            => JsonConvert.DeserializeObject<Scanner>(json);
+        public override string ToString()
+            => JsonConvert.SerializeObject(this, Formatting.None);
+        public string ToCSCode(string class_name)
+        {
+            var builder = new StringBuilder();
+            var indent = "";
+            Action up_indent = () => { indent += "    "; };
+            Action down_indent = () => { if (indent.Length > 0) indent = indent.Substring(4); };
+            Action<string> append = (string s) => { builder.Append($"{indent}{s}\r\n"); };
+            append("public class " + class_name);
+            append("{");
+            up_indent();
+
+            ///////////////////
+            append("int[][] transition_table = new int[][] {");
+            up_indent();
+            foreach (var gt in transition_table)
+                append("new int[] {" + string.Join(",", gt.Select(x => x.ToString().PadLeft(4))) + " },");
+            down_indent();
+            append("};");
+            append("");
+
+            ///////////////////
+            append("string[] accept_table = new string[] {");
+            up_indent();
+            append(string.Join(",", accept_table.Select(x => x != null ? $"\"{x.ToString().PadLeft(4)}\"" : "null")));
+            down_indent();
+            append("};");
+            append("");
+
+            down_indent();
+            append("}");
+            return builder.ToString();
         }
     }
 }
