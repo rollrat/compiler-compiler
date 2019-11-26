@@ -5,6 +5,10 @@ Supports RE to NFA, e-NFA, NFA to DFA, DFA Minimization, Lexical Analyzer Genera
 
 If you want to use my code, use ParserGenerator.cs and ScannerGenerator.cs in the top folder.
 
+Graphviz is required to use the graph visualization feature of Regular Expression. 
+
+https://graphviz.gitlab.io/
+
 ## InhaCC - Compiler Compiler Collection
 
 ![image](1.png)
