@@ -23,6 +23,8 @@ C++ Version: https://github.com/rollrat/jsonhead
 
 C# Version: https://github.com/rollrat/compiler-compiler/tree/master/CC/JsonParser
 
+Javascript Lexer/Parser Generator: https://github.com/rollrat/compiler-compiler/tree/master/CC/JavascriptParser
+
 ## InhaCC - Compiler Compiler Collection
 
 ![image](1.png)
