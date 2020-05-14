@@ -9,6 +9,12 @@ Graphviz is required to use the graph visualization feature of Regular Expressio
 
 https://graphviz.gitlab.io/
 
+## Release 1.3 (2020-05-14)
+
+Binary: https://github.com/rollrat/compiler-compiler/releases/download/1.3/Release.zip
+
+Dependency(GraphViz): https://graphviz.gitlab.io/_pages/Download/Download_windows.html
+
 ## InhaCC - Compiler Compiler Collection
 
 ![image](1.png)
