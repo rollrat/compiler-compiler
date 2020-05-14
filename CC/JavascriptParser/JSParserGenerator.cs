@@ -585,7 +585,7 @@ namespace JavascriptParser
                 gen.PrintProductionRules();
 
                 System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
-                gen.GenerateLALR();
+                gen.GenerateLALR2();
                 var end = sw.ElapsedMilliseconds;
                 sw.Stop();
                 Console.WriteLine($"{end.ToString("#,#")}");
