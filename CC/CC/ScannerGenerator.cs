@@ -226,7 +226,7 @@ namespace CC
                                             ch_list.Add('\t');
                                             break;
                                         case 'r':
-                                            ch_list.Add('\t');
+                                            ch_list.Add('\r');
                                             break;
                                         case 'x':
                                             char ch2;
