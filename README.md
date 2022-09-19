@@ -35,6 +35,30 @@ Javascript Lexer/Parser Generator: https://github.com/rollrat/compiler-compiler/
 
 ![image](3.png)
 
+## Regular Expression (Regex)
+
+### Example of Floating Point Number
+
+`[0-9]+(\.[0-9]+)?([Ee][\+\-]?[0-9]+)?`
+
+<img src="a.png" alt="drawing" width="800"/>
+
+<img src="b.png" alt="drawing" width="800"/>
+
+### Example 2
+
+`(100+1+|01)+`
+
+https://www.acmicpc.net/problem/1013
+
+<img src="c.png" alt="drawing" width="800"/>
+
+<img src="d.png" alt="drawing" width="800"/>
+
+<img src="e.png" alt="drawing" width="800"/>
+
+<img src="f.png" alt="drawing" width="800"/>
+
 ## Scanner Generator / Lexical Analyzer Generator
 
 A tool for analyzing regular expressions using `(`,`)`,`+`,`*`,`?`,`|`,`[`,`]`,`^`,`.` as tokens and generating Scanner tables.
