@@ -1,4 +1,5 @@
 # compiler-compiler
+
 Compiler Compiler based on CSharp
 
 Supports RE to NFA, e-NFA, NFA to DFA, DFA Minimization, Lexical Analyzer Generator, SLR, LALR(from LR(1)), LALR(from LR(0)), LR(1) Parser Generator.
@@ -25,16 +26,6 @@ C# Version: https://github.com/rollrat/compiler-compiler/tree/master/CC/JsonPars
 
 Javascript Lexer/Parser Generator: https://github.com/rollrat/compiler-compiler/tree/master/CC/JavascriptParser
 
-## InhaCC - Compiler Compiler Collection
-
-![image](1.png)
-
-![image](2.png)
-
-![image](4.png)
-
-![image](3.png)
-
 ## Regular Expression (Regex)
 
 ### Example of Floating Point Number
@@ -60,6 +51,8 @@ https://www.acmicpc.net/problem/1013
 <img src="f.png" alt="drawing" width="800"/>
 
 ## Scanner Generator / Lexical Analyzer Generator
+
+<img src="2.png" alt="drawing" width="800"/>
 
 A tool for analyzing regular expressions using `(`,`)`,`+`,`*`,`?`,`|`,`[`,`]`,`^`,`.` as tokens and generating Scanner tables.
 
@@ -97,6 +90,10 @@ num, 9999
 ```
 
 ## Parser Generator
+
+<img src="3.png" alt="drawing" width="800"/>
+
+<img src="4.png" alt="drawing" width="800"/>
 
 This source code includes the SLR, LR(1), and LALR parser generators.
 
