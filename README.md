@@ -52,6 +52,10 @@ https://www.acmicpc.net/problem/1013
 
 <img src="f.png" alt="drawing" width="800"/>
 
+### How to use?
+
+You cannot use this just to test regex.
+
 ## Scanner Generator / Lexical Analyzer Generator
 
 <img src="2.png" alt="drawing" width="800"/>
@@ -93,9 +97,9 @@ num, 9999
 
 ## Parser Generator
 
-<img src="3.png" alt="drawing" width="800"/>
-
 <img src="4.png" alt="drawing" width="800"/>
+
+<img src="3.png" alt="drawing" width="800"/>
 
 This source code includes the SLR, LR(1), and LALR parser generators.
 
